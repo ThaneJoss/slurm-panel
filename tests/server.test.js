@@ -32,7 +32,7 @@ test('configuration is portable and its public projection contains only presenta
     title: 'Research queue', slurmWebUrl: 'https://slurm.example.org/',
     refreshIntervalMs: 7000, timeZone: 'UTC', mode: 'gpuq',
     clusterName: 'SLURM',
-    capabilities: { cancelJobs: false, cancellationRequiresToken: false, artifacts: false, logDownload: false },
+    capabilities: { cancelJobs: false, cancellationRequiresToken: false, artifacts: true, logDownload: true },
   });
   assert.equal(JSON.stringify(publicConfig(config)).includes('/srv/'), false);
   assert.equal(readConfig({ PANEL_MODE: 'gpuq' }, ['--demo']).mode, 'demo');

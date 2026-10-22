@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { publicConfig } from './config.js';
+import { createActions } from './actions.js';
 
 const publicDirectory = new URL('../../public/', import.meta.url);
 const assets = new Map([
@@ -22,8 +23,9 @@ function send(request, response, status, body, contentType = 'application/json; 
   response.end(request.method === 'HEAD' ? undefined : content);
 }
 
-/** Build a read-only HTTP server; callers own the store's lifecycle. */
-export function createApp({ config, store, logger = console }) {
+/** Build the dashboard HTTP server; callers own the store's lifecycle. */
+export function createApp({ config, store, logger = console, runCommand }) {
+  const handleAction = createActions({ config, store, logger, runCommand });
   return createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -39,12 +41,6 @@ export function createApp({ config, store, logger = console }) {
       "object-src 'none'",
     ].join('; '));
 
-    if (!['GET', 'HEAD'].includes(request.method)) {
-      response.setHeader('Allow', 'GET, HEAD');
-      send(request, response, 405, { error: 'This dashboard is read-only.' });
-      return;
-    }
-
     let url;
     let pathname;
     try {
@@ -56,6 +52,12 @@ export function createApp({ config, store, logger = console }) {
     }
 
     try {
+      if (await handleAction(request, response, pathname)) return;
+      if (!['GET', 'HEAD'].includes(request.method)) {
+        response.setHeader('Allow', 'GET, HEAD');
+        send(request, response, 405, { error: 'Method not allowed.' });
+        return;
+      }
       const asset = assets.get(pathname);
       if (asset) {
         const [filename, contentType] = asset;

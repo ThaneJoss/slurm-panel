@@ -4,9 +4,11 @@ The dashboard queries complete queue history with server-side filtering, sorting
 
 ![Slurm Panel with fictional demo data](docs/assets/demo.png)
 
+[Mobile layout preview](docs/assets/demo-mobile.png)
+
 [简体中文](README.md)
 
-A read-only experiment dashboard built with **Node.js and pnpm**. It displays the actual gpuq tasks managed by persistent Slurm consumers, including training progress, attempt history and logs. The backend reads SQLite and local files directly, with no Python web service or third-party runtime dependencies.
+An experiment dashboard built with **Node.js and pnpm**. Live queues are read-only by default, with optional authenticated job cancellation. It displays the actual gpuq tasks managed by persistent Slurm consumers, including training progress, attempt history and logs. The backend reads SQLite and local files directly, with no Python web service or third-party runtime dependencies.
 
 The included demo uses fictional data and runs without Slurm, GPUs or gpuq. Live mode targets the custom gpuq SQLite schema described in [data-source.md](docs/data-source.md); connecting another Slurm deployment requires a matching adapter.
 
@@ -37,9 +39,11 @@ Live responses include task commands, working directories, file paths and log co
 - View Slurm consumer IDs, attempts and exit status.
 - Display script-reported epochs, batches, updates, losses, throughput and budget progress.
 - Select and follow queue/project logs with periodic refresh.
+- Download complete logs and inspect metadata for associated output files.
+- Simulate cancellation in demo mode, or optionally request live cancellation through gpuq with an operator token.
 - Responsive layout, configurable title, time zone and Slurm-web link.
 
-The dashboard only reads data. It does not submit or cancel tasks, retry jobs, or probe GPUs. Script-reported budget progress does not establish that validation or final evaluation has finished.
+Live mode only queries data by default. Enabling cancellation requires both `ENABLE_JOB_CONTROL=1` and `JOB_CONTROL_TOKEN`; the backend sends the request through the existing gpuq command, then reads the actual state from the queue. Script-reported budget progress does not establish that validation or final evaluation has finished.
 
 ## Configuration
 
@@ -53,6 +57,10 @@ The dashboard only reads data. It does not submit or cancel tasks, retry jobs, o
 | `SLURM_WEB_URL` | unset | Optional HTTP(S) Slurm-web link |
 | `TZ` | unset | Optional IANA zone; otherwise the browser's zone |
 | `REFRESH_INTERVAL_MS` | `5000` | Refresh interval in milliseconds |
+| `ENABLE_JOB_CONTROL` | `0` | Set to `1` to allow live cancellation requests |
+| `JOB_CONTROL_TOKEN` | unset | Required server-side operator token for live cancellation |
+| `GPUQ_COMMAND` | `gpuq` | Existing executable invoked with fixed cancellation arguments |
+| `PANEL_PUBLIC_ORIGIN` | unset | Page origin behind an HTTPS proxy, such as `https://panel.example.com` |
 
 See [configuration and API](docs/configuration.md), [data source](docs/data-source.md) and [deployment](docs/deployment.md). The detailed guides are in Chinese.
 

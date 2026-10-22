@@ -2,7 +2,7 @@
   "name": "slurm-panel",
   "version": "0.1.0",
   "private": true,
-  "description": "A read-only experiment dashboard for Slurm-backed gpuq queues",
+  "description": "An experiment dashboard for Slurm-backed gpuq queues with optional authenticated job cancellation",
   "type": "module",
   "license": "MIT",
   "engines": {

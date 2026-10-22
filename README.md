@@ -2,11 +2,13 @@
 
 [English](README.en.md)
 
-使用 **Node.js + pnpm** 的只读实验进度面板。展示 Slurm 常驻消费者背后的 gpuq 实际任务、训练脚本报告的进度和日志。后端直接读取 SQLite 与文件，不需要 Python Web 服务，也没有第三方运行时依赖。
+使用 **Node.js + pnpm** 的实验进度面板，真实队列默认只读，可选启用经过身份验证的任务取消。展示 Slurm 常驻消费者背后的 gpuq 实际任务、训练脚本报告的进度和日志。后端直接读取 SQLite 与文件，不需要 Python Web 服务，也没有第三方运行时依赖。
 
 项目提供虚构数据演示，可在没有 Slurm、GPU 或 gpuq 的电脑上启动。真实数据模式对接本文档描述的自定义 gpuq SQLite 结构；已有 Slurm 集群需要先提供相应的数据适配器。
 
 ![Slurm Panel 虚构数据演示](docs/assets/demo.png)
+
+[手机布局预览](docs/assets/demo-mobile.png)
 
 ## 功能
 
@@ -14,10 +16,12 @@
 - 查看消费者心跳、Slurm 作业 ID、任务尝试历史及退出状态。
 - 展示训练脚本报告的 epoch、batch、更新步数、损失、吞吐与预算进度。
 - 查看队列日志、项目日志，切换来源并跟随更新。
+- 下载完整日志，查看任务关联的产物文件信息。
+- 演示模式模拟取消任务；真实模式可选启用令牌认证后通过 gpuq 请求取消。
 - 定时刷新，适配桌面和手机屏幕。
 - 配置标题、时区及已有 Slurm-web 的跳转地址。
 
-面板只提供查询，不提交、取消或重试任务，不探测 GPU。预算百分比和预算结束时间来自训练脚本，不代表验证和最终评估已经完成。
+真实模式默认仅查询数据。启用取消操作需要同时设置 `ENABLE_JOB_CONTROL=1` 和 `JOB_CONTROL_TOKEN`；后端通过已有 gpuq 命令请求取消，实际状态随后从队列读取。预算百分比和预算结束时间来自训练脚本，不代表验证和最终评估已经完成。
 
 ## 快速开始
 
@@ -72,6 +76,10 @@ pnpm start
 | `SLURM_WEB_URL` | 无 | 可选的 Slurm-web HTTP(S) 地址 |
 | `TZ` | 无 | 可选 IANA 时区；未设置时前端使用浏览器时区 |
 | `REFRESH_INTERVAL_MS` | `5000` | 自动刷新间隔，毫秒 |
+| `ENABLE_JOB_CONTROL` | `0` | 设为 `1` 时允许真实队列取消请求 |
+| `JOB_CONTROL_TOKEN` | 无 | 真实取消操作必需的服务端令牌 |
+| `GPUQ_COMMAND` | `gpuq` | 现有 gpuq 可执行文件，用固定参数请求取消 |
+| `PANEL_PUBLIC_ORIGIN` | 无 | HTTPS 反向代理下的页面来源，如 `https://panel.example.com` |
 
 ## 项目结构
 
