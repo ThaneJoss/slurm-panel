@@ -1,0 +1,22 @@
+name: CI
+
+'on':
+  push:
+    branches: [main]
+  pull_request: {}
+  merge_group: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ThaneJoss/github-ci/.github/workflows/ci.yml@main
+    with:
+      profile: node
+      node-version: '24'
+      package-manager: pnpm
+      package-manager-version: '12.4.2'
+      lockfile: pnpm-lock.yaml
+      test-command: pnpm test

@@ -71,6 +71,10 @@ The source is organized into `src/server/`, `src/data/`, `public/`, `examples/`,
 - `pnpm test` uses the built-in Node.js test runner.
 - `pnpm test:browser` runs Playwright 1.61.1 browser regressions through `e2e/check-ui.js`.
 
+The [CI caller](.github/workflows/ci.yml) reuses [ThaneJoss/github-ci](https://github.com/ThaneJoss/github-ci) at `main`, declaring only Node.js 24, pnpm 12.4.2, the lockfile and `pnpm test`. Pull requests, merge queues and updates to `main` run the Node tests and the template's dependency audit; manual dispatch is also available.
+
+The caller uses the template's explicit `node` profile to accommodate native HTML/CSS and deployment files. Browser regressions are separate and run through the Slurm commands below when needed.
+
 Install Chromium once before running browser regressions:
 
 ```bash

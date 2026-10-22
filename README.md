@@ -101,6 +101,10 @@ docs/             接入、配置与部署说明
 - `pnpm test` 使用 Node.js 内置测试运行器。
 - `pnpm test:browser` 使用 Playwright 1.61.1 执行浏览器回归。
 
+GitHub Actions 通过 [CI 引用配置](.github/workflows/ci.yml) 调用 [ThaneJoss/github-ci](https://github.com/ThaneJoss/github-ci) 的统一工作流，跟随其 `main` 分支；本仓库仅声明 Node.js 24、pnpm 12.4.2、锁文件与 `pnpm test`。PR、合并队列和 `main` 更新会运行 Node 测试及模板提供的依赖审计，也支持手动触发。
+
+配置使用模板公开的 `node` 模式，以支持仓库中的原生 HTML/CSS 和部署文件。浏览器回归不包含在这项 CI 中，仍通过下方 Slurm 命令按需执行。
+
 首次运行浏览器回归前安装 Chromium：
 
 ```bash
