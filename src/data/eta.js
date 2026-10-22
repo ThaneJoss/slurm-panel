@@ -28,7 +28,7 @@ export function progressOf(telemetry, totalEpochs = null) {
   const totalUpdates = number(telemetry.total_updates);
   const explicitPercent = number(telemetry.percent);
   const epochPercent = fraction === null ? null : fraction * 100;
-  const totalPercent = totalUpdates > 0 ? (updates === null ? null : updates / totalUpdates * 100)
+  const totalPercent = totalUpdates > 0 && updates !== null ? updates / totalUpdates * 100
     : epochPosition !== null && totalEpochs > 0 ? epochPosition / totalEpochs * 100
       : explicitPercent;
   return {
@@ -97,10 +97,9 @@ export function createProgressEstimator({ halfLifeSeconds = 300, state = [] } = 
     const position = number(telemetry?.total_percent);
     const started = number(job.attempt?.started);
     // Budget percentages measure elapsed allocation, not completed work.
-    const hasWork = number(telemetry?.total_updates) > 0
-      ? number(telemetry?.updates) !== null
-      : (number(telemetry?.total_epochs) > 0 && number(telemetry?.completed_epochs) !== null)
-        || telemetry?.percent_kind === 'reported';
+    const hasWork = (number(telemetry?.total_updates) > 0 && number(telemetry?.updates) !== null)
+      || (number(telemetry?.total_epochs) > 0 && number(telemetry?.completed_epochs) !== null)
+      || telemetry?.percent_kind === 'reported';
     if (!telemetry || updated === null || position === null || !hasWork
       || started === null || updated < started) return;
     const history = historyFor(job);

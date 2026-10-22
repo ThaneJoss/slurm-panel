@@ -1,5 +1,5 @@
 import { dirname, join } from 'node:path';
-import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { directoryCandidates, fileInfo, outputDirectories, progressFile, tail } from './files.js';
 import { artifactMetadata } from './artifacts.js';
@@ -14,6 +14,18 @@ const ATTEMPT_COLUMNS = `id, job_id, number, gpu, state, slurm_job_id, log_path,
 const PROGRESS_KEYS = ['progress_percent', 'updates', 'step', 'epoch', 'current_epoch', 'completed_epochs', 'phase'];
 const ACTIVE = ['assigned', 'launching', 'starting', 'running'];
 const RANGE_SECONDS = { '24h': 86400, '7d': 604800, '30d': 2592000 };
+
+// This panel-owned snapshot can contain histories for many jobs and is not a
+// training progress document, whose reader deliberately enforces a 1 MiB cap.
+async function readEtaState(path) {
+  try {
+    const saved = JSON.parse(await readFile(path, 'utf8'));
+    return Array.isArray(saved?.histories) ? saved.histories : [];
+  } catch (error) {
+    if (error instanceof SyntaxError || ['ENOENT', 'ENOTDIR', 'EISDIR'].includes(error.code)) return [];
+    throw error;
+  }
+}
 
 function decodeJob(row) {
   const { environment, ...job } = row;
@@ -158,12 +170,13 @@ export function createGpuqStore({ databasePath, metricsFile = null, etaStateFile
   const database = new DatabaseSync(databasePath, { readOnly: true });
   const logObservations = new Map();
   let estimator = createProgressEstimator();
-  const ready = etaStateFile ? progressFile(etaStateFile).then((saved) => {
-    if (Array.isArray(saved?.record.histories)) {
-      estimator = createProgressEstimator({ state: saved.record.histories });
-    }
+  const ready = etaStateFile ? readEtaState(etaStateFile).then((state) => {
+    estimator = createProgressEstimator({ state });
   }) : Promise.resolve();
   database.exec('PRAGMA query_only = ON; PRAGMA busy_timeout = 3000;');
+  database.function('panel_display_name', { deterministic: true }, (name, environment) => (
+    displayName(name, JSON.parse(environment).PANEL_DISPLAY_NAME)
+  ));
   const activeJobsQuery = database.prepare(`SELECT ${JOB_COLUMNS}, environment FROM jobs
     WHERE state IN ('assigned', 'launching', 'starting', 'running') ORDER BY id DESC`);
   const jobQuery = database.prepare(`SELECT ${JOB_COLUMNS}, environment FROM jobs WHERE id = ?`);
@@ -246,8 +259,9 @@ export function createGpuqStore({ databasePath, metricsFile = null, etaStateFile
       values.push(query.state);
     }
     if (query.q) {
-      conditions.push('(instr(lower(name), lower(?)) > 0 OR instr(CAST(id AS TEXT), ?) > 0)');
-      values.push(query.q, query.q);
+      conditions.push(`(instr(lower(name), lower(?)) > 0 OR instr(CAST(id AS TEXT), ?) > 0
+        OR instr(lower(panel_display_name(name, environment)), lower(?)) > 0)`);
+      values.push(query.q, query.q, query.q);
     }
     if (query.staleOnly) {
       conditions.push(staleJobs.length ? `id IN (${staleJobs.map(() => '?').join(',')})` : '0');

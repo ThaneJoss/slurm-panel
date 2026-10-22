@@ -7,6 +7,7 @@ import {
   averageUtilization, GpuHistory, parseGpuInventory, parseGpuProcesses, parseUsers, processOwners,
 } from '../src/data/gpu-monitor.js';
 import { readGpuMetrics } from '../src/data/metrics.js';
+import { enrichWorkers } from '../src/data/query.js';
 
 test('NVIDIA data covers all compute and graphics processes without publishing executable paths', async () => {
   const inventory = parseGpuInventory('0, GPU-fixture, 65, 12288, 24576\n1, GPU-other, N/A, 0, 24576\n');
@@ -100,4 +101,37 @@ test('metrics reader keeps host process and mean fields but excludes collector h
   assert.equal(serialized.includes('private-token'), false);
   assert.equal(serialized.includes('/private/collector'), false);
   assert.equal(serialized.includes('private_sample'), false);
+});
+
+test('count-only exporter snapshots preserve occupancy while invalid counts remain unknown', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'slurm-gpu-counts-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'gpus.json');
+  const records = [
+    { process_count: 0 },
+    { process_count: 3, utilization_percent: 0 },
+    { process_count: 2 },
+    { process_count: '2' },
+    { process_count: 99, processes: [] },
+    { process_count: 0, processes: [{ pid: 111, user: 'alice', name: 'python', type: 'C' }] },
+    ...[undefined, null, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, true, '', 'unknown']
+      .map((process_count) => ({ process_count, memory_total_bytes: 24 * 1024 ** 3 })),
+    { process_count: -1 },
+  ].map((record, gpu) => ({ gpu, updated: 1000, ...record }));
+  await writeFile(path, JSON.stringify({ gpus: records }));
+  const workers = enrichWorkers([], [], await readGpuMetrics(path), 1005);
+
+  assert.deepEqual(workers.slice(0, 6).map((worker) => [worker.state, worker.metrics.process_count]), [
+    ['idle', 0], ['running', 3], ['running', 2], ['running', 2], ['idle', 0], ['running', 1],
+  ]);
+  assert.equal(workers[0].metrics.utilization_percent, null);
+  assert.equal(workers[0].metrics.processes, null);
+  assert.equal(workers[2].metrics.utilization_percent, null);
+  assert.equal(workers[2].metrics.processes, null);
+  for (const worker of workers.slice(6, -1)) {
+    assert.equal(worker.state, 'unknown');
+    assert.equal(worker.metrics.process_count, null);
+  }
+  assert.equal(workers.at(-1).state, 'unknown');
+  assert.equal(workers.at(-1).metrics, null);
 });

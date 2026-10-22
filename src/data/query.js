@@ -133,7 +133,8 @@ export function selectJobs(jobs, input = {}, now = Date.now() / 1000) {
   const matches = history.filter((job) => (
     matchesState(job, options.state)
     && (!options.staleOnly || job.stale)
-    && (!query || String(job.name).toLocaleLowerCase().includes(query) || String(job.id).includes(query))
+    && (!query || String(job.name).toLocaleLowerCase().includes(query) || String(job.id).includes(query)
+      || String(job.display_name ?? '').toLocaleLowerCase().includes(query))
   ));
   matches.sort((left, right) => {
     if (options.sort === 'active') {
@@ -164,7 +165,9 @@ function projectMetrics(record, now) {
     pid: process.pid, user: process.user, name: process.name,
     type: process.type, memory_used_bytes: finiteNumber(process.memory_used_bytes),
   })) : null;
-  if (utilization === null && memoryTotal === null && memoryUsed === null && processes === null) return null;
+  const reportedCount = finiteNumber(record.process_count);
+  const processCount = processes?.length ?? (Number.isSafeInteger(reportedCount) ? reportedCount : null);
+  if (utilization === null && memoryTotal === null && memoryUsed === null && processCount === null) return null;
   return {
     utilization_percent: utilization,
     utilization_5m_percent: average !== null && average <= 100 ? average : null,
@@ -172,7 +175,7 @@ function projectMetrics(record, now) {
     memory_used_bytes: memoryUsed,
     memory_total_bytes: memoryTotal,
     processes,
-    process_count: processes?.length ?? null,
+    process_count: processCount,
     updated: finiteNumber(record.updated),
   };
 }
