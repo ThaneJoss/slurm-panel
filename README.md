@@ -56,7 +56,7 @@ pnpm start
 
 真实模式会显示任务名称、命令、工作目录、日志路径与日志正文，其中可能包含私有信息。默认仅监听本机回环地址。通过内网或已经配置身份验证的反向代理提供访问；面板本身不提供登录功能。公开发布源码时，不要将真实队列文件和 `.env` 加入仓库。
 
-参见 [数据接入](docs/data-source.md)、[配置和接口](docs/configuration.md) 与 [部署说明](docs/deployment.md)。
+参见 [面板功能](docs/dashboard.md)、[数据接入](docs/data-source.md)、[配置和接口](docs/configuration.md) 与 [部署说明](docs/deployment.md)。
 
 ## 配置
 

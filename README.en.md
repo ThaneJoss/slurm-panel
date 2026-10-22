@@ -78,6 +78,8 @@ gpuq submit --name slurm-panel-browser --cwd /opt/slurm-panel -- pnpm test:brows
 
 Commit messages and Pull Request descriptions use Chinese. Do not commit real databases, logs, local environment settings or machine-specific deployment details.
 
+The redesigned dashboard includes five separate status summaries, server-side filters and pagination, linked GPU executors, and four task detail tabs. See the [dashboard guide](docs/dashboard.md) for interactions and data-source boundaries.
+
 ## License
 
 [MIT](LICENSE)
