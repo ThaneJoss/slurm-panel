@@ -5,7 +5,7 @@ import { createApp } from './app.js';
 const config = readConfig();
 const store = config.mode === 'demo'
   ? (await import('../data/demo.js')).createDemoStore()
-  : (await import('../data/gpuq.js')).createGpuqStore({ databasePath: config.databasePath });
+  : (await import('../data/gpuq.js')).createGpuqStore({ databasePath: config.databasePath, metricsFile: config.metricsFile });
 const server = createApp({ config, store });
 
 try {

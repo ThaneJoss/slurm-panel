@@ -21,6 +21,8 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
   if (mode === 'gpuq' && (!databasePath || !isAbsolute(databasePath))) {
     throw new Error('GPUQ_DATABASE must be an absolute path in gpuq mode');
   }
+  const metricsFile = env.GPU_METRICS_FILE || null;
+  if (metricsFile && !isAbsolute(metricsFile)) throw new Error('GPU_METRICS_FILE must be an absolute path');
   const port = positiveInteger(env.PORT, 'PORT', 5013);
   if (port > 65535) throw new Error('PORT must be at most 65535');
 
@@ -39,15 +41,18 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
     host: env.HOST || '127.0.0.1',
     port,
     databasePath,
+    metricsFile,
     mode,
-    title: env.PANEL_TITLE || 'Slurm Panel',
+    clusterName: env.PANEL_CLUSTER_NAME || 'SLURM',
+    title: env.PANEL_TITLE || '实验进度',
     slurmWebUrl,
     timeZone,
     refreshIntervalMs: positiveInteger(env.REFRESH_INTERVAL_MS, 'REFRESH_INTERVAL_MS', 5000),
+    capabilities: Object.freeze({ cancelJobs: false, cancellationRequiresToken: false, artifacts: false, logDownload: false }),
   });
 }
 
 export function publicConfig(config) {
-  const { title, slurmWebUrl, refreshIntervalMs, timeZone, mode } = config;
-  return { title, slurmWebUrl, refreshIntervalMs, timeZone, mode };
+  const { title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode, capabilities } = config;
+  return { title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode, capabilities };
 }

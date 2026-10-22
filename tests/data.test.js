@@ -18,7 +18,7 @@ test('gpuq schema preserves job/retry ordering and excludes submission secrets a
   const store = createGpuqStore(fixture);
   t.after(() => store.close());
 
-  const listing = await store.listJobs();
+  const listing = await store.listJobs({ sort: 'newest' });
   assert.deepEqual(listing.jobs.map((job) => job.id), [2, 1]);
   assert.deepEqual(listing.counts, { queued: 1, running: 1 });
   assert.equal(listing.workers[0].slurm_job_id, 'synthetic-worker');
@@ -216,7 +216,7 @@ test('demo returns isolated synthetic data and never exposes private fixture mes
   try {
     const listing = await store.listJobs();
     assert.ok(listing.jobs.length >= 4);
-    assert.deepEqual(new Set(listing.jobs.map((job) => job.state)), new Set(['running', 'queued', 'succeeded', 'failed']));
+    assert.deepEqual(new Set(listing.jobs.map((job) => job.state)), new Set(['running', 'queued', 'succeeded', 'failed', 'cancelled']));
     const job = listing.jobs.find((item) => item.state === 'running');
     const detail = await store.getJob(job.id);
     assert.equal(detail.messages, undefined);
@@ -231,4 +231,24 @@ test('demo returns isolated synthetic data and never exposes private fixture mes
   } finally {
     store.close();
   }
+});
+
+test('demo cancellation changes only its in-memory queue and updates global statistics', () => {
+  const store = createDemoStore();
+  const before = store.listJobs();
+  const running = before.jobs.find((job) => job.state === 'running');
+  assert.ok(store.getArtifacts(running.id).files.some((file) => file.name === 'best.pt'));
+  assert.equal(store.getArtifacts(999), null);
+  assert.equal(store.getLogSource(running.id, 'attempt-1').key, 'attempt-1');
+  assert.equal(store.getLogSource(running.id, '../anything'), null);
+  const cancelled = store.cancelJob(running.id);
+  assert.equal(cancelled.state, 'cancelled');
+  assert.equal(cancelled.attempt.state, 'cancelled');
+  assert.ok(cancelled.attempt.finished);
+  const after = store.listJobs();
+  assert.equal(after.summary.active, before.summary.active - 1);
+  assert.equal(after.summary.cancelled, before.summary.cancelled + 1);
+  assert.equal(store.cancelJob(999), null);
+  const another = createDemoStore();
+  assert.equal(another.getJob(running.id).state, 'running');
 });

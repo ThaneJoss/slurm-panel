@@ -31,6 +31,8 @@ test('configuration is portable and its public projection contains only presenta
   assert.deepEqual(publicConfig(config), {
     title: 'Research queue', slurmWebUrl: 'https://slurm.example.org/',
     refreshIntervalMs: 7000, timeZone: 'UTC', mode: 'gpuq',
+    clusterName: 'SLURM',
+    capabilities: { cancelJobs: false, cancellationRequiresToken: false, artifacts: false, logDownload: false },
   });
   assert.equal(JSON.stringify(publicConfig(config)).includes('/srv/'), false);
   assert.equal(readConfig({ PANEL_MODE: 'gpuq' }, ['--demo']).mode, 'demo');
@@ -47,10 +49,29 @@ test('invalid data sources and unsafe external links are configuration errors', 
     { PORT: '65536' },
     { REFRESH_INTERVAL_MS: '0' },
     { TZ: 'Not/A_Time_Zone' },
+    { GPU_METRICS_FILE: 'relative-metrics.json' },
   ]) {
     assert.throws(() => readConfig(env, []));
   }
   assert.throws(() => readConfig({}, ['--unknown']));
+});
+
+test('HTTP list filters and pages on the server, and invalid query parameters return 400', async (t) => {
+  const base = await listen(t);
+  const response = await fetch(`${base}/api/jobs?page=2&pageSize=1&state=active&sort=oldest`);
+  assert.equal(response.status, 200);
+  const listing = await response.json();
+  assert.equal(listing.jobs.length, 1);
+  assert.equal(listing.jobs[0].id, 5);
+  assert.deepEqual(listing.pagination, { page: 2, pageSize: 1, total: 3, totalPages: 3 });
+  assert.equal(listing.summary.total, 7);
+  assert.equal(listing.summary.active, 3);
+  assert.deepEqual(listing.workers.find((worker) => worker.gpu === 6).job_ids, [4]);
+  for (const query of ['page=0', 'pageSize=101', 'state=unknown', 'range=forever', 'staleOnly=yes']) {
+    const invalid = await fetch(`${base}/api/jobs?${query}`);
+    assert.equal(invalid.status, 400, query);
+    assert.ok((await invalid.json()).error.includes('query parameter'));
+  }
 });
 
 test('HTTP API serves the standalone demo with details, logs and public configuration', async (t) => {

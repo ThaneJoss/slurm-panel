@@ -106,12 +106,13 @@ try {
 
   await page.goto(address, { waitUntil: 'networkidle' });
   await page.locator('#jobs .job').nth(3).waitFor();
-  await waitForText('#log', '[demo] epoch 12 / batch 80');
-  assert.equal(await page.title(), 'Slurm Panel');
+  await clickJob(4);
+  await waitForText('#log', '[demo] epoch 48 / batch 80');
+  assert.equal(await page.title(), '实验进度');
   assert.equal(await page.locator('#demo-badge').isVisible(), true);
-  assert.equal(await page.locator('#jobs .job').count(), 4);
-  assert.equal(await page.locator('#workers .worker').count(), 2);
-  assert.deepEqual(await page.locator('.metric strong').allTextContents(), ['1', '1', '1', '1']);
+  assert.equal(await page.locator('#jobs .job').count(), 7);
+  assert.equal(await page.locator('#workers .worker').count(), 8);
+  assert.deepEqual(await page.locator('.metric strong').allTextContents(), ['3', '1', '1', '2']);
   assert.equal(await page.locator('#log-source').inputValue(), 'project-0-train');
   await assertNoOverflow();
 
@@ -143,17 +144,17 @@ try {
   assert.equal(await page.locator('#jobs .job').count(), 0);
   await waitForText('#jobs .empty', '没有匹配的任务');
   await page.locator('#search').fill('');
-  assert.equal(await page.locator('#jobs .job').count(), 1);
+  assert.equal(await page.locator('#jobs .job').count(), 3);
   assert.match(await page.locator('#jobs').innerText(), /#4 ·/);
   await page.locator('#state').selectOption('succeeded');
   assert.match(await page.locator('#jobs').innerText(), /#2 ·/);
   await page.locator('#state').selectOption('failed');
   assert.match(await page.locator('#jobs').innerText(), /#1 ·/);
   await page.locator('#state').selectOption('all');
-  assert.equal(await page.locator('#jobs .job').count(), 4);
+  assert.equal(await page.locator('#jobs .job').count(), 7);
 
   await page.locator('#log-source').selectOption('attempt-1');
-  await waitForText('#log', '[demo] 启动语义分割示例');
+  await waitForText('#log', '[demo] 启动步长1全量训练');
   assert.equal(await page.locator('#follow-log').isChecked(), true);
   await page.locator('#follow-log').uncheck();
   assert.equal(await page.locator('#follow-log').isChecked(), false);
@@ -183,12 +184,12 @@ try {
   await refresh();
   assert.equal(await page.locator('#error').isVisible(), true);
   assert.match(await page.locator('#error').innerText(), /HTTP 503/);
-  assert.equal(await page.locator('#jobs .job').count(), 4, 'An API failure must keep the last successful list.');
+  assert.equal(await page.locator('#jobs .job').count(), 7, 'An API failure must keep the last successful list.');
   await refresh();
   assert.equal(await page.locator('#error').isVisible(), false);
 
   await clickJob(4);
-  await waitForText('#log', '[demo] epoch 12 / batch 80');
+  await waitForText('#log', '[demo] epoch 48 / batch 80');
   if (screenshotDirectory) {
     await mkdir(screenshotDirectory, { recursive: true });
     await page.screenshot({ path: resolve(screenshotDirectory, 'slurm-panel-desktop.png'), fullPage: true });
@@ -202,7 +203,7 @@ try {
 
   injectName = true;
   await refresh();
-  assert.equal(await page.locator('#jobs .job-name').first().innerText(), `#4 · ${maliciousName}`);
+  assert.equal(await page.locator('#jobs .job[aria-pressed="true"] .job-name').innerText(), `#4 · ${maliciousName}`);
   assert.equal(await page.locator('#detail h2').innerText(), `#4 · ${maliciousName}`);
   assert.equal(await page.locator('#jobs img, #detail img').count(), 0);
   assert.equal(await page.evaluate(() => window.__panelXss), undefined);
