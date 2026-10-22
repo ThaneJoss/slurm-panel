@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="description" content="只读 Slurm 与 gpuq 实验进度面板。查看任务、训练进度、运行记录与日志。">
+    <title>Slurm Panel</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳转到任务面板</a>
+    <header class="page-header">
+      <div>
+        <span class="eyebrow">SLURM / GPU QUEUE</span>
+        <div class="title-row">
+          <h1 id="title">Slurm Panel</h1>
+          <span id="demo-badge" class="demo-badge" hidden>演示数据</span>
+        </div>
+        <p>只读实验进度 · 任务、训练阶段与日志</p>
+      </div>
+      <div class="actions">
+        <a id="slurm-link" href="#" hidden>打开 Slurm-web ↗</a>
+        <button id="refresh" type="button">立即刷新</button>
+        <label class="checkbox-label">
+          <input id="auto" type="checkbox" checked>
+          <span id="auto-label">自动刷新</span>
+        </label>
+      </div>
+    </header>
+
+    <main id="main">
+      <div id="error" role="alert" hidden></div>
+      <section class="metrics" id="metrics" aria-label="任务状态汇总"></section>
+
+      <section class="workers card" aria-labelledby="workers-title">
+        <div class="section-heading">
+          <h2 id="workers-title">调度消费者</h2>
+          <p class="muted" id="updated" aria-live="polite">正在读取队列…</p>
+        </div>
+        <div id="workers"></div>
+      </section>
+
+      <div class="content">
+        <section class="jobs card" aria-labelledby="jobs-title">
+          <div class="section-head">
+            <div class="section-heading">
+              <h2 id="jobs-title">任务列表</h2>
+              <span class="muted" id="job-count"></span>
+            </div>
+            <div class="filters">
+              <input id="search" type="search" placeholder="搜索名称或任务 ID" aria-label="搜索任务">
+              <select id="state" aria-label="任务状态">
+                <option value="all">全部状态</option>
+                <option value="active">进行中</option>
+                <option value="queued">排队 / 等待资源</option>
+                <option value="succeeded">已完成</option>
+                <option value="failed">失败 / 已取消</option>
+              </select>
+            </div>
+          </div>
+          <div id="jobs" aria-busy="true">
+            <p class="empty">正在读取任务…</p>
+          </div>
+        </section>
+
+        <section id="detail" class="detail card" aria-label="任务详情" aria-busy="false">
+          <p class="empty">选择一个任务，查看进度与日志</p>
+        </section>
+      </div>
+
+      <footer>
+        <p id="time-zone-note">时间使用浏览器所在时区。</p>
+        <p>数据来自 gpuq 记录、任务日志与进度文件。预算进度由训练脚本报告；预算结束时间不代表验证和最终评估已经完成。</p>
+      </footer>
+    </main>
+    <noscript><p class="empty">请启用 JavaScript 以查看任务与日志。</p></noscript>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,153 @@
+{
+  "workers": [
+    { "gpu": 0, "slurm_job_id": "demo-worker-01" },
+    { "gpu": 1, "slurm_job_id": "demo-worker-02" }
+  ],
+  "jobs": [
+    {
+      "id": 4,
+      "name": "语义分割 · 小型示例",
+      "argv": ["node", "train.mjs", "--output", "/demo/runs/segmentation"],
+      "cwd": "/demo/projects/segmentation",
+      "state": "running",
+      "createdAgo": 4200,
+      "updatedAgo": 3,
+      "message": "演示数据：训练进行中",
+      "attempts": [
+        {
+          "id": 4,
+          "number": 1,
+          "gpu": 0,
+          "state": "running",
+          "slurm_job_id": "demo-worker-01",
+          "log_path": "/demo/queue/jobs/4/attempt-1.log",
+          "createdAgo": 4000,
+          "startedAgo": 3900,
+          "finishedAgo": null,
+          "exit_code": null,
+          "message": ""
+        }
+      ],
+      "telemetry": {
+        "phase": "training",
+        "epoch": 12,
+        "batch": 80,
+        "batches": 120,
+        "updates": 1400,
+        "samples": 22400,
+        "percent": 56,
+        "loss": 0.1842,
+        "images_per_second": 48.6,
+        "budget_end": null,
+        "source": "/demo/runs/segmentation/status.json"
+      },
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 0",
+          "path": "/demo/queue/jobs/4/attempt-1.log",
+          "text": "[demo] 启动语义分割示例\n[demo] epoch=12 batch=80/120 loss=0.1842 images/s=48.6\n{\"phase\":\"training\",\"updates\":1400,\"progress_percent\":56}\n此日志为虚构示例，不代表实际运行的训练。\n"
+        },
+        {
+          "key": "project-0-train",
+          "label": "项目日志 · train.log",
+          "path": "/demo/runs/segmentation/train.log",
+          "text": "[demo] epoch 11 完成，已保存进度检查点\n[demo] epoch 12 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "图像分类 · 待运行",
+      "argv": ["node", "train.mjs", "--output-dir=/demo/runs/classification"],
+      "cwd": "/demo/projects/classification",
+      "state": "queued",
+      "createdAgo": 1200,
+      "updatedAgo": 1200,
+      "message": "演示数据：等待派发",
+      "attempts": [],
+      "telemetry": null,
+      "logs": []
+    },
+    {
+      "id": 2,
+      "name": "基准评估 · 已完成",
+      "argv": ["node", "evaluate.mjs", "--output", "/demo/runs/evaluation"],
+      "cwd": "/demo/projects/evaluation",
+      "state": "succeeded",
+      "createdAgo": 7200,
+      "updatedAgo": 3600,
+      "message": "演示数据：评估完成",
+      "attempts": [
+        {
+          "id": 2,
+          "number": 1,
+          "gpu": 1,
+          "state": "succeeded",
+          "slurm_job_id": "demo-worker-02",
+          "log_path": "/demo/queue/jobs/2/attempt-1.log",
+          "createdAgo": 7100,
+          "startedAgo": 7000,
+          "finishedAgo": 3600,
+          "exit_code": 0,
+          "message": ""
+        }
+      ],
+      "telemetry": {
+        "phase": "completed",
+        "epoch": null,
+        "batch": 100,
+        "batches": 100,
+        "updates": 100,
+        "samples": 1600,
+        "percent": 100,
+        "loss": null,
+        "images_per_second": 102.4,
+        "budget_end": null,
+        "source": "/demo/runs/evaluation/status.json"
+      },
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 1",
+          "path": "/demo/queue/jobs/2/attempt-1.log",
+          "text": "[demo] 评估示例：100/100 批次完成\n[demo] 已保存结果文件\n[demo] 退出码 0\n"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "数据检查 · 失败示例",
+      "argv": ["node", "inspect.mjs", "--output", "/demo/runs/inspection"],
+      "cwd": "/demo/projects/inspection",
+      "state": "failed",
+      "createdAgo": 10000,
+      "updatedAgo": 9800,
+      "message": "演示数据：输入清单包含无效条目",
+      "attempts": [
+        {
+          "id": 1,
+          "number": 1,
+          "gpu": 1,
+          "state": "failed",
+          "slurm_job_id": "demo-worker-02",
+          "log_path": "/demo/queue/jobs/1/attempt-1.log",
+          "createdAgo": 9950,
+          "startedAgo": 9900,
+          "finishedAgo": 9800,
+          "exit_code": 1,
+          "message": "输入清单包含无效条目"
+        }
+      ],
+      "telemetry": null,
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 1",
+          "path": "/demo/queue/jobs/1/attempt-1.log",
+          "text": "[demo] 读取虚构输入清单\n[demo] Error: 清单第 12 行缺少文件名\n[demo] 退出码 1\n"
+        }
+      ]
+    }
+  ]
+}

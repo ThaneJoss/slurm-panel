@@ -1,0 +1,17 @@
+.git
+node_modules
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+logs
+state
+coverage
+playwright-report
+test-results
+.tmp
