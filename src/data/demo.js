@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { outputCandidates } from './files.js';
 import { enrichJob, enrichWorkers, selectJobs } from './query.js';
+import { displayName } from './names.js';
 
 /** A self-contained, entirely fictional queue for trying the UI. */
 export function createDemoStore() {
@@ -20,6 +21,7 @@ export function createDemoStore() {
     const logs = messages.map(({ text, ...source }) => source);
     return {
       ...fields,
+      display_name: displayName(fields.name, fields.display_name),
       created: now - createdAgo,
       updated: now - updatedAgo,
       attempt_count: attempts.length,
@@ -28,6 +30,10 @@ export function createDemoStore() {
       attempts,
       logs,
       messages,
+      estimate: fields.estimate_seconds ? {
+        remaining_seconds: fields.estimate_seconds, end_at: now + fields.estimate_seconds,
+        scope: 'training_and_periodic_validation', method: 'recency_weighted', sample_count: 18, updated: now,
+      } : null,
     };
   });
   const artifacts = new Map(jobs.map((job) => {
@@ -43,7 +49,7 @@ export function createDemoStore() {
     const timestamp = Date.now() / 1000;
     const all = jobs.map(({ attempts, logs, messages, ...job }) => enrichJob(job, timestamp));
     const metrics = (fixture.gpu_metrics ?? []).map(({ updatedAgo, ...record }) => ({
-      ...record, updated: now - updatedAgo,
+      ...record, updated: timestamp - updatedAgo,
     }));
     return structuredClone({
       ...selectJobs(all, options, timestamp),

@@ -1,6 +1,6 @@
 # Slurm Panel
 
-The dashboard queries complete queue history with server-side filtering, sorting and pagination. Worker assignments cover all active jobs. Optional `GPU_METRICS_FILE` snapshots are exported by the scheduler; the backend does not probe GPU hardware. Set `PANEL_CLUSTER_NAME` for cluster branding and `PANEL_TITLE` for the page title (default: `实验进度`). See [data integration](docs/data-source.md) for snapshot formats and progress timestamp semantics.
+The dashboard queries complete queue history with server-side filtering, sorting and pagination. Queue assignments cover all active gpuq jobs, while the independent GPU monitor covers every user's compute and graphics processes. HTTP requests read `GPU_METRICS_FILE` snapshots without probing hardware. Set `PANEL_CLUSTER_NAME` for cluster branding and `PANEL_TITLE` for the page title (default: `实验进度`). See [data integration](docs/data-source.md) for snapshot formats and progress semantics.
 
 ![Slurm Panel with fictional demo data](docs/assets/demo.png)
 
@@ -37,13 +37,15 @@ Live responses include task commands, working directories, file paths and log co
 
 - Search and filter tasks, with state summaries and consumer heartbeats.
 - View Slurm consumer IDs, attempts and exit status.
-- Display script-reported epochs, batches, updates, losses, throughput and budget progress.
+- Display separate per-epoch and total progress, updates, losses and throughput.
+- Calculate end-time estimates from observed progress with greater weight on recent intervals; sample in the background and optionally persist history.
+- Show every user's GPU processes, current memory usage and time-weighted utilization over the last five minutes.
 - Select and follow queue/project logs with periodic refresh.
 - Download complete logs and inspect metadata for associated output files.
 - Simulate cancellation in demo mode, or optionally request live cancellation through gpuq with an operator token.
 - Responsive layout, configurable title, time zone and Slurm-web link.
 
-Live mode only queries data by default. Enabling cancellation requires both `ENABLE_JOB_CONTROL=1` and `JOB_CONTROL_TOKEN`; the backend sends the request through the existing gpuq command, then reads the actual state from the queue. Script-reported budget progress does not establish that validation or final evaluation has finished.
+Live mode only queries queue data by default. Enabling cancellation requires both `ENABLE_JOB_CONTROL=1` and `JOB_CONTROL_TOKEN`; the backend sends the request through the existing gpuq command, then reads the actual state from the queue. End-time estimates state their scope; unknown final-evaluation time is not presented as included. Budget progress or a zero ETA does not establish completion.
 
 ## Configuration
 
@@ -53,7 +55,10 @@ Live mode only queries data by default. Enabling cancellation requires both `ENA
 | `HOST` | `127.0.0.1` | Bind address |
 | `PORT` | `5013` | HTTP port |
 | `GPUQ_DATABASE` | unset | Required absolute database path in live mode |
-| `PANEL_TITLE` | `Slurm Panel` | Page title |
+| `GPU_METRICS_FILE` | unset | Absolute GPU snapshot path from the independent collector or a compatible exporter |
+| `ETA_STATE_FILE` | unset | Optional absolute path for progress history written by the panel |
+| `PANEL_CLUSTER_NAME` | `SLURM` | Cluster name |
+| `PANEL_TITLE` | `实验进度` | Page title |
 | `SLURM_WEB_URL` | unset | Optional HTTP(S) Slurm-web link |
 | `TZ` | unset | Optional IANA zone; otherwise the browser's zone |
 | `REFRESH_INTERVAL_MS` | `5000` | Refresh interval in milliseconds |
@@ -62,11 +67,11 @@ Live mode only queries data by default. Enabling cancellation requires both `ENA
 | `GPUQ_COMMAND` | `gpuq` | Existing executable invoked with fixed cancellation arguments |
 | `PANEL_PUBLIC_ORIGIN` | unset | Page origin behind an HTTPS proxy, such as `https://panel.example.com` |
 
-See [configuration and API](docs/configuration.md), [data source](docs/data-source.md) and [deployment](docs/deployment.md). The detailed guides are in Chinese.
+See [configuration and API](docs/configuration.md), [data source](docs/data-source.md) and [deployment](docs/deployment.md), including the independent collector and writable state directory. Use concise job names; a submitted `PANEL_DISPLAY_NAME` can provide a short display title while preserving the recorded name. The detailed guides are in Chinese.
 
 ## Development
 
-The source is organized into `src/server/`, `src/data/`, `public/`, `examples/`, `tests/`, `e2e/`, `deploy/` and `docs/`. `pnpm dev` needs no build step. `pnpm install` includes development dependencies; running the backend and frontend requires no third-party packages.
+The source is organized into `src/server/`, `src/data/`, `scripts/`, `public/`, `examples/`, `tests/`, `e2e/`, `deploy/` and `docs/`. `pnpm dev` needs no build step. `pnpm install` includes development dependencies; running the backend and frontend requires no third-party packages.
 
 - `pnpm test` uses the built-in Node.js test runner.
 - `pnpm test:browser` runs Playwright 1.61.1 browser regressions through `e2e/check-ui.js`.

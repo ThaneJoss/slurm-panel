@@ -1,4 +1,7 @@
-import { el, icon, activeStates, formatDate, formatDuration, formatNumber, progress, stateBadge } from './dom.js';
+import {
+  el, icon, activeStates, formatDate, formatDuration, formatNumber, progressTrack, stateBadge,
+  gpuMemory, utilizationWindow, gpuProcesses,
+} from './dom.js';
 import { createDetailPanel } from './detail.js';
 
 const $ = (id) => document.getElementById(id);
@@ -107,17 +110,34 @@ function renderWorkers() {
   const busy = snapshot.workers.filter((worker) => worker.state === 'running').length;
   const idle = snapshot.workers.filter((worker) => worker.state === 'idle').length;
   const unknown = snapshot.workers.length - busy - idle;
-  elements['workers-summary'].textContent = `${snapshot.workers.length} 个执行器 · ${busy} 执行中 · ${idle} 待命${unknown ? ` · ${unknown} 状态未知` : ''}`;
+  const expanded = new Set([...elements.workers.querySelectorAll('.worker')]
+    .filter((worker) => worker.querySelector('.gpu-processes')?.open).map((worker) => worker.dataset.gpu));
+  elements['workers-summary'].textContent = `${snapshot.workers.length} 张 GPU · ${busy} 使用中 · ${idle} 空闲${unknown ? ` · ${unknown} 状态未知` : ''}`;
   elements.workers.replaceChildren(...snapshot.workers.map((worker) => {
     const current = worker.gpu === selectedGpu;
     const item = el('article', `worker${current ? ' selected' : ''}`);
     item.dataset.gpu = worker.gpu;
     const heading = el('div', 'worker-heading');
     const state = el('span', worker.state === 'running' ? 'worker-state busy' : 'worker-state');
-    const stateLabel = { running: '执行中', idle: '待命', unknown: '状态未知' };
+    const stateLabel = { running: '使用中', idle: '空闲', unknown: '状态未知' };
     state.append(el('span', 'status-dot'), document.createTextNode(stateLabel[worker.state]));
     heading.append(el('strong', null, `GPU ${worker.gpu}`), state);
-    item.append(heading, el('span', 'worker-slurm', `Job #${worker.slurm_job_id}`));
+    item.append(heading);
+    const metrics = worker.metrics;
+    const readings = el('div', 'worker-readings');
+    readings.append(el('span', 'worker-memory', `显存 ${gpuMemory(metrics)}`));
+    const utilization = el('span', 'worker-utilization', `利用率 ${metrics?.utilization_5m_percent == null ? '—' : `${formatNumber(metrics.utilization_5m_percent, 0)}%`}`);
+    utilization.title = utilizationWindow(metrics) || '尚未提供 5 分钟平均利用率';
+    readings.append(utilization);
+    const window = utilizationWindow(metrics);
+    if (window) readings.append(el('small', 'worker-window', window));
+    item.append(readings);
+    const processes = gpuProcesses(metrics, 'worker-processes');
+    processes.open = expanded.has(String(worker.gpu));
+    item.append(processes);
+    if (worker.slurm_job_id != null) {
+      item.append(el('span', 'worker-slurm', `消费者 #${worker.slurm_job_id}`));
+    }
     for (const id of worker.job_ids) {
       const job = el('button', 'worker-job', `任务 #${id}`);
       job.type = 'button';
@@ -133,23 +153,27 @@ function renderWorkers() {
 
 function renderProgress(job) {
   const telemetry = job.telemetry;
+  const completedEpochs = telemetry?.completed_epochs ?? telemetry?.epoch;
+  const totalCaption = telemetry?.updates != null && telemetry?.total_updates > 0
+    ? `${formatNumber(telemetry.updates, 0)} / ${formatNumber(telemetry.total_updates, 0)} 步`
+    : completedEpochs != null && telemetry.total_epochs != null
+      ? `${formatNumber(completedEpochs, 0)} / ${formatNumber(telemetry.total_epochs, 0)} epochs` : null;
   const content = el('span', 'job-progress');
-  const tags = el('span', 'job-tags');
-  for (const label of job.tags) tags.append(el('span', 'tag', label));
-  if (tags.childNodes.length) content.append(tags);
-  if (telemetry?.total_epochs != null && telemetry.epoch != null) {
-    content.append(el('span', 'job-progress-caption', `${formatNumber(telemetry.epoch, 0)} / ${formatNumber(telemetry.total_epochs, 0)} epochs`));
-  } else if (telemetry?.updates != null) {
-    content.append(el('span', 'job-progress-caption', `${formatNumber(telemetry.updates, 0)} 步`));
-  }
-  if (telemetry?.percent != null) {
+  const readings = [
+    ['epoch', '单轮', telemetry?.epoch_percent, telemetry?.batch != null && telemetry.batches != null
+      ? `${formatNumber(telemetry.batch, 0)} / ${formatNumber(telemetry.batches, 0)}` : null],
+    ['total', '总进度', telemetry?.total_percent, totalCaption],
+  ];
+  for (const [kind, label, value, caption] of readings) {
+    const reading = el('span', `job-progress-reading ${kind}-progress`);
+    const heading = el('span', 'job-progress-caption');
+    heading.append(el('span', 'job-progress-label', label));
+    if (caption) heading.append(el('span', null, caption));
     const line = el('span', 'job-progress-line');
-    const bar = progress(telemetry.percent);
-    bar.setAttribute('aria-label', telemetry.percent_kind === 'budget' ? '脚本报告的训练预算进度' : '脚本报告的训练进度');
-    line.append(bar, el('span', 'job-percent', `${telemetry.percent_kind === 'budget' ? '预算 ' : ''}${formatNumber(telemetry.percent, 0)}%`));
-    if (telemetry.percent_kind === 'budget') line.title = '百分比为训练预算进度';
-    content.append(line);
-  } else if (job.tags.length === 0) content.append(el('span', 'muted', '未报告进度'));
+    line.append(progressTrack(value, label), el('span', 'job-percent', value == null ? '—' : `${formatNumber(value, 0)}%`));
+    reading.append(heading, line);
+    content.append(reading);
+  }
   return content;
 }
 
@@ -160,7 +184,9 @@ function renderJob(job) {
   row.setAttribute('aria-pressed', String(selectedId === job.id));
   const info = el('span', 'job-info');
   const heading = el('span', 'job-heading');
-  heading.append(el('span', 'job-id', `#${job.id}`), el('span', 'job-name', job.name));
+  const name = el('span', 'job-name', job.display_name || job.name);
+  name.title = job.name;
+  heading.append(el('span', 'job-id', `#${job.id}`), name);
   info.append(heading);
   const attempt = job.attempt;
   const parts = [];
@@ -312,7 +338,7 @@ elements['workers-toggle'].addEventListener('click', () => {
   const collapsed = !elements.workers.hidden;
   elements.workers.hidden = collapsed;
   elements['workers-toggle'].setAttribute('aria-expanded', String(!collapsed));
-  elements['workers-toggle'].setAttribute('aria-label', `${collapsed ? '展开' : '收起'} GPU 执行器`);
+  elements['workers-toggle'].setAttribute('aria-label', `${collapsed ? '展开' : '收起'}全机 GPU`);
   elements['workers-toggle'].replaceChildren(icon(collapsed ? 'chevronDown' : 'chevronUp'));
 });
 

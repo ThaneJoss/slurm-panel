@@ -137,7 +137,8 @@
           "path": "/demo/runs/experiment-6/train.log",
           "text": "[demo] epoch 11 完成，已保存进度检查点\n[demo] epoch 12 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
         }
-      ]
+      ],
+      "estimate_seconds": 5480
     },
     {
       "id": 5,
@@ -179,7 +180,7 @@
         "epoch": 26,
         "batch": 80,
         "batches": 120,
-        "updates": 1400,
+        "updates": 3080,
         "samples": 22400,
         "percent": 32.5,
         "loss": 0.1842,
@@ -188,7 +189,8 @@
         "source": "/demo/runs/experiment-5/status.json",
         "total_epochs": 80,
         "percent_kind": "epoch",
-        "eta_seconds": 3720
+        "eta_seconds": 3720,
+        "total_updates": 12000
       },
       "logs": [
         {
@@ -203,7 +205,8 @@
           "path": "/demo/runs/experiment-5/train.log",
           "text": "[demo] epoch 25 完成，已保存进度检查点\n[demo] epoch 26 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
         }
-      ]
+      ],
+      "estimate_seconds": 5480
     },
     {
       "id": 4,
@@ -269,7 +272,8 @@
           "path": "/demo/runs/experiment-4/train.log",
           "text": "[demo] epoch 47 完成，已保存进度检查点\n[demo] epoch 48 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
         }
-      ]
+      ],
+      "estimate_seconds": 5480
     },
     {
       "id": 3,
@@ -385,56 +389,120 @@
       "utilization_percent": 0,
       "memory_used_bytes": 429496729.6,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 0,
+      "utilization_window_seconds": 300,
+      "processes": [],
+      "process_count": 0
     },
     {
       "gpu": 1,
       "utilization_percent": 0,
       "memory_used_bytes": 429496729.6,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 0,
+      "utilization_window_seconds": 300,
+      "processes": [],
+      "process_count": 0
     },
     {
       "gpu": 2,
       "utilization_percent": 78,
       "memory_used_bytes": 13207024435.2,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 66,
+      "utilization_window_seconds": 300,
+      "processes": [
+        {
+          "pid": 42002,
+          "user": "researcher-a",
+          "name": "python",
+          "type": "C",
+          "memory_used_bytes": 13207024435.2
+        }
+      ],
+      "process_count": 1
     },
     {
       "gpu": 3,
       "utilization_percent": 84,
       "memory_used_bytes": 16213501542.4,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 71,
+      "utilization_window_seconds": 300,
+      "processes": [
+        {
+          "pid": 42003,
+          "user": "researcher-a",
+          "name": "python",
+          "type": "C",
+          "memory_used_bytes": 16213501542.4
+        }
+      ],
+      "process_count": 1
     },
     {
       "gpu": 4,
       "utilization_percent": 0,
       "memory_used_bytes": 429496729.6,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 0,
+      "utilization_window_seconds": 300,
+      "processes": [],
+      "process_count": 0
     },
     {
       "gpu": 5,
       "utilization_percent": 0,
       "memory_used_bytes": 429496729.6,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 0,
+      "utilization_window_seconds": 300,
+      "processes": [],
+      "process_count": 0
     },
     {
       "gpu": 6,
       "utilization_percent": 96,
       "memory_used_bytes": 19971597926.4,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 82,
+      "utilization_window_seconds": 300,
+      "processes": [
+        {
+          "pid": 42006,
+          "user": "researcher-b",
+          "name": "python",
+          "type": "C",
+          "memory_used_bytes": 19971597926.4
+        }
+      ],
+      "process_count": 1
     },
     {
       "gpu": 7,
-      "utilization_percent": 0,
-      "memory_used_bytes": 429496729.6,
+      "utilization_percent": 70,
+      "memory_used_bytes": 12884901888,
       "memory_total_bytes": 25769803776,
-      "updatedAgo": 2
+      "updatedAgo": 2,
+      "utilization_5m_percent": 65,
+      "utilization_window_seconds": 300,
+      "processes": [
+        {
+          "pid": 42007,
+          "user": "researcher-b",
+          "name": "python",
+          "type": "C",
+          "memory_used_bytes": 12884901888
+        }
+      ],
+      "process_count": 1
     }
   ]
 }

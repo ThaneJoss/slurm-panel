@@ -82,7 +82,10 @@ try {
     }
     const result = await route.fetch();
     const data = await result.json();
-    if (injectName && data.jobs[0]) data.jobs[0].name = maliciousName;
+    if (injectName && data.jobs[0]) {
+      data.jobs[0].name = maliciousName;
+      data.jobs[0].display_name = maliciousName;
+    }
     if (syntheticPagination) {
       const requestedPage = Number(url.searchParams.get('page') || 1);
       data.pagination = { page: requestedPage, pageSize: 10, total: 20, totalPages: 2 };
@@ -94,7 +97,10 @@ try {
     const id = Number(new URL(route.request().url()).pathname.split('/').at(-1));
     const result = await route.fetch();
     const job = await result.json();
-    if (injectName) job.name = maliciousName;
+    if (injectName) {
+      job.name = maliciousName;
+      job.display_name = maliciousName;
+    }
     if (id !== delayedJobId) {
       await route.fulfill({ response: result, json: job });
       return;
@@ -162,6 +168,47 @@ try {
   await noHorizontalOverflow();
   checks.push('five status cards and global executor strip');
 
+  const progressJob = runningJobs.find((job) => job.telemetry?.epoch_percent != null && job.telemetry.total_percent != null);
+  assert.ok(progressJob, 'The demo must report both single-epoch and total progress.');
+  const progressRow = page.locator(`#jobs .job[data-id="${progressJob.id}"]`);
+  assert.equal(await progressRow.locator('.job-tags, .tag').count(), 0);
+  assert.equal(await progressRow.locator('.job-progress-reading').count(), 2);
+  assert.equal(await progressRow.locator('.epoch-progress progress').evaluate((node) => node.value), progressJob.telemetry.epoch_percent);
+  assert.equal(await progressRow.locator('.total-progress progress').evaluate((node) => node.value), progressJob.telemetry.total_percent);
+  await clickJob(progressJob.id);
+  assert.equal(await page.locator('#detail .detail-progress-reading').count(), 2);
+  assert.equal(await page.locator('#detail .epoch-progress progress').evaluate((node) => node.value), progressJob.telemetry.epoch_percent);
+  assert.equal(await page.locator('#detail .total-progress progress').evaluate((node) => node.value), progressJob.telemetry.total_percent);
+  await expectText('#detail .detail-heading h2', progressJob.display_name || progressJob.name);
+  assert.equal(await progressRow.locator('.job-name').getAttribute('title'), progressJob.name);
+  const estimatedJob = runningJobs.find((job) => job.estimate?.end_at != null);
+  assert.ok(estimatedJob, 'The demo must include a panel-calculated end-time estimate.');
+  await clickJob(estimatedJob.id);
+  await expectText('#detail .detail-estimate', '预计结束');
+  assert.equal(await page.locator('#detail .detail-estimate strong').count(), 1);
+  assert.equal((await page.locator('#detail').innerText()).includes('脚本预计剩余'), false);
+  checks.push('single-epoch and total progress, compact display names and panel end-time estimate');
+
+  const externalGpu = fixture.workers.find((worker) => worker.job_ids.length === 0 && worker.metrics?.process_count > 0);
+  assert.ok(externalGpu, 'The demo must include another user occupying a GPU outside this queue.');
+  const externalCard = page.locator(`#workers .worker[data-gpu="${externalGpu.gpu}"]`);
+  await expectText(`#workers .worker[data-gpu="${externalGpu.gpu}"] .worker-state`, '使用中');
+  const externalMetrics = externalGpu.metrics;
+  assert.equal(await externalCard.locator('.worker-utilization').innerText(),
+    `利用率 ${Number(externalMetrics.utilization_5m_percent).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}%`);
+  const g = (bytes) => `${(bytes / 1024 ** 3).toLocaleString('zh-CN', { maximumFractionDigits: 1 })}G`;
+  assert.equal(await externalCard.locator('.worker-memory').innerText(),
+    `显存 ${g(externalMetrics.memory_used_bytes)}/${g(externalMetrics.memory_total_bytes)}`);
+  await externalCard.locator('.gpu-processes summary').click();
+  assert.equal(await externalCard.locator('.gpu-process-list li').count(), externalMetrics.processes.length);
+  for (const process of externalMetrics.processes) {
+    await expectText(`#workers .worker[data-gpu="${externalGpu.gpu}"] .gpu-process-list`, process.user);
+  }
+  await refresh();
+  assert.equal(await externalCard.locator('.gpu-processes').getAttribute('open'), '');
+  await externalCard.locator('.gpu-processes summary').click();
+  checks.push('whole-machine GPU memory, five-minute utilization and all-user process inspection');
+
   await page.locator('#auto').uncheck();
   const pausedAt = listRequests.length;
   await page.waitForTimeout(config.refreshIntervalMs + 150);
@@ -206,7 +253,7 @@ try {
 
   await queryChange(() => page.locator('#search').fill(queuedJob.name), 'q', queuedJob.name);
   assert.equal(await page.locator('#jobs .job').count(), 1);
-  await expectText('#jobs', queuedJob.name);
+  await expectText('#jobs', queuedJob.display_name || queuedJob.name);
   await queryChange(() => page.locator('#search').fill('no-such-demo-experiment'), 'q', 'no-such-demo-experiment');
   assert.equal(await page.locator('#jobs .job').count(), 0);
   await queryChange(() => page.locator('#search').fill(''), 'q', '');
@@ -221,7 +268,7 @@ try {
   await queryChange(() => page.locator('#range').selectOption('all'), 'range', 'all');
   await queryChange(() => page.locator('#stale-filter').click(), 'staleOnly', '1');
   assert.ok(await page.locator('#jobs .job').count() >= 1);
-  await expectText('#jobs', staleJob.name);
+  await expectText('#jobs', staleJob.display_name || staleJob.name);
   await queryChange(() => page.locator('#stale-filter').click(), 'staleOnly', '0');
   checks.push('server-side search, history, order and delayed-progress filter');
 
@@ -237,6 +284,13 @@ try {
 
   const activeId = runningJobs.find((job) => !job.stale)?.id ?? runningJobs[0].id;
   await clickJob(activeId);
+  const stepsJob = runningJobs.find((job) => job.telemetry?.total_updates > 0);
+  if (stepsJob) {
+    await clickJob(stepsJob.id);
+    await expectText('#detail .total-progress', '步');
+    await expectText(`#jobs .job[data-id="${stepsJob.id}"] .total-progress`, '步');
+    await clickJob(activeId);
+  }
   await page.getByRole('tab', { name: '日志', exact: true }).click();
   const detail = await (await fetch(`${origin}/api/jobs/${activeId}`)).json();
   await page.locator('#log-source').selectOption(detail.logs[0].key);
@@ -295,7 +349,7 @@ try {
   releaseDelayedRequest();
   await delayedCompleted;
   await expectText('#detail h2', `#${queuedJob.id}`);
-  assert.equal(await page.locator('#detail h2').innerText(), `#${queuedJob.id} · ${queuedJob.name}`);
+  assert.equal(await page.locator('#detail h2').innerText(), `#${queuedJob.id} · ${queuedJob.display_name || queuedJob.name}`);
   checks.push('late responses cannot replace the selected task');
 
   const existingRows = await page.locator('#jobs .job').count();

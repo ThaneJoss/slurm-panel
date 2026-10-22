@@ -23,6 +23,8 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
   }
   const metricsFile = env.GPU_METRICS_FILE || null;
   if (metricsFile && !isAbsolute(metricsFile)) throw new Error('GPU_METRICS_FILE must be an absolute path');
+  const etaStateFile = env.ETA_STATE_FILE || null;
+  if (etaStateFile && !isAbsolute(etaStateFile)) throw new Error('ETA_STATE_FILE must be an absolute path');
   const port = positiveInteger(env.PORT, 'PORT', 5013);
   if (port > 65535) throw new Error('PORT must be at most 65535');
 
@@ -62,6 +64,7 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
     port,
     databasePath,
     metricsFile,
+    etaStateFile,
     mode,
     clusterName: env.PANEL_CLUSTER_NAME || 'SLURM',
     title: env.PANEL_TITLE || '实验进度',

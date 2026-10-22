@@ -12,10 +12,13 @@
 .detail-section { border: 1px solid #e3eaf2; border-radius: 6px; margin: 0 0 12px; padding: 12px 14px; min-width: 0; }
 .detail-section h3 { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 700; color: #08183c; }
 .detail-section-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.detail-progress-reading { margin-top: 14px; }
+.detail-progress-reading h4 { margin: 0; color: #5c7497; font-size: 12px; font-weight: 500; }
+.detail-progress-reading + .detail-progress-reading { margin-top: 18px; }
 .detail-progress-statistics { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; margin: 10px 0 8px; }
 .detail-progress-value { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
-.detail-progress-value strong, .detail-percent { font-size: 29px; line-height: 1.15; letter-spacing: -.5px; font-variant-numeric: tabular-nums; color: #071737; }
-.detail-progress-value > span { font-size: 27px; font-weight: 600; color: #7b8ca4; }
+.detail-progress-value strong, .detail-percent { font-size: 25px; line-height: 1.15; letter-spacing: -.5px; font-variant-numeric: tabular-nums; color: #071737; }
+.detail-progress-value > span { font-size: 23px; font-weight: 600; color: #7b8ca4; }
 .detail-progress-value small { margin-left: 2px; font-size: 14px; color: #567099; }
 .detail-progress-value .detail-progress-unavailable { font-size: 17px; font-weight: 500; }
 .detail-progress-bar { display: block; width: 100%; height: 11px; border: 0; border-radius: 8px; overflow: hidden; appearance: none; background: #e0e6ee; }
@@ -23,6 +26,9 @@
 .detail-progress-bar::-webkit-progress-value, .metric-progress::-webkit-progress-value { background: linear-gradient(90deg, #00b9ad, #30c4b9); border-radius: 8px; }
 .detail-progress-bar::-moz-progress-bar, .metric-progress::-moz-progress-bar { background: #00b9ad; border-radius: 8px; }
 .detail-progress-meta { display: flex; justify-content: space-between; gap: 5px 12px; flex-wrap: wrap; color: #1a2e50; font-size: 13px; margin-top: 10px; }
+.detail-estimate { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 12px; margin-top: 12px; line-height: 1.6; font-size: 13px; }
+.detail-estimate-label, .detail-estimate-remaining { color: #5c7497; }
+.detail-estimate strong { color: #0b625e; font-weight: 650; font-variant-numeric: tabular-nums; }
 .detail-progress-note { font-size: 11px; color: #6a7d97; line-height: 1.5; margin: 9px 0 0; }
 .detail-start-time { font-size: 13px; color: #5b7295; border-top: 1px solid #edf0f5; margin: 12px -14px -12px; padding: 12px 14px; }
 .gpu-metrics-card { padding-top: 9px; padding-bottom: 8px; }

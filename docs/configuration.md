@@ -1,6 +1,6 @@
 # 配置和 HTTP 接口
 
-`PANEL_CLUSTER_NAME` 设置页首集群名称，默认 `SLURM`；`PANEL_TITLE` 默认 `实验进度`。可选 `GPU_METRICS_FILE` 必须是调度侧 GPU 指标快照的绝对路径，该路径不通过公共配置接口返回。
+`PANEL_CLUSTER_NAME` 设置页首集群名称，默认 `SLURM`；`PANEL_TITLE` 默认 `实验进度`。可选 `GPU_METRICS_FILE` 为独立采集服务或兼容 exporter 的快照绝对路径；`ETA_STATE_FILE` 为面板进度采样历史的持久化绝对路径。两者都不通过公共配置接口返回，也不写入队列数据库。
 
 任务列表 `GET /api/jobs` 支持：
 
@@ -15,7 +15,7 @@
 
 响应包含 `pagination: {page, pageSize, total, totalPages}`，以及时间范围内的 `summary: {total, active, queued, succeeded, failed, cancelled, stale}`。状态卡统计不受搜索、状态标签或过期提示筛选影响。空结果仍返回第 1 页和 1 个总页数。非法参数返回 HTTP 400。
 
-`workers[].job_ids` 包含对应 GPU 的全部活跃任务 ID；`state` 为 `running`、`idle` 或没有心跳记录时的 `unknown`。`metrics` 来自外部快照，缺失时为 `null`。
+`workers[].job_ids` 包含对应 GPU 的本队列全部活跃任务 ID。GPU 的 `state` 依据全机快照显示 `running/idle/unknown`，不能只从本队列任务推断整卡空闲。`metrics` 来自外部快照，缺失或超过 30 秒未更新时为 `null`；消费者心跳另行保留。
 
 `GET /api/config` 额外返回 `clusterName` 与 `capabilities`。`artifacts` 和 `logDownload` 为 `true`；`cancelJobs` 在演示模式或真实取消已启用时为 `true`。`cancellationRequiresToken` 仅在真实取消已启用时为 `true`。
 
@@ -53,7 +53,11 @@
 }
 ```
 
-每条任务包含 `id`、`name`、`argv`、`cwd`、`state`、`created`、`updated`、`attempt_count`、`message`、最新 `attempt` 和 `telemetry`。详情额外包含 `attempts` 和 `logs`。提交环境不作为接口字段返回，服务端仅从指定的输出目录变量中查找进度文件。
+每条任务包含 `id`、原始 `name`、精简的 `display_name`、`argv`、`cwd`、`state`、`created`、`updated`、`attempt_count`、`message`、最新 `attempt`、`telemetry` 和面板计算的 `estimate`。详情额外包含 `attempts` 和 `logs`。提交环境不整体公开；服务端只读取指定输出目录提示和可选的 `PANEL_DISPLAY_NAME`。
+
+`telemetry.epoch_percent` 为本轮进度，`telemetry.total_percent` 为总进度。`estimate` 为 `null` 或 `{remaining_seconds, end_at, scope, method, sample_count, updated}`；`method=recency_weighted` 表示近期加权。`scope=training_and_periodic_validation` 只涵盖训练与观察到的常规验证，明确提供最终评估时长时为 `full_task`。算法与进度字段见 [数据接入](data-source.md)。
+
+`workers[].metrics` 包含当前 `memory_used_bytes/memory_total_bytes`、瞬时 `utilization_percent`、页面采用的 `utilization_5m_percent`、实际均值窗口 `utilization_window_seconds`、`updated`、`process_count` 及全部用户的 `processes`。进程条目为 `{pid, user, name, type, memory_used_bytes}`；`type` 可为计算或图形类型。未知值保持 `null`，瞬时值不能冒充 5 分钟均值。
 
 响应不缓存。静态资源由同一个 Node.js HTTP 服务提供，不需要外部 CDN、跨域配置或独立前端服务器。
 

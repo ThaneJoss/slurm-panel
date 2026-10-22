@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseQuery, enrichJob, selectJobs, enrichWorkers } from '../src/data/query.js';
+import { displayName } from '../src/data/names.js';
 
 test('query validates parameters and supports URL and internal object inputs', () => {
   assert.deepEqual(parseQuery(new URLSearchParams('page=2&pageSize=20&q=trial&state=failed&sort=oldest&range=7d&staleOnly=1')), {
@@ -80,7 +81,7 @@ test('running priority, queued group and stale-only filters preserve recorded li
   assert.equal(stale.jobs[0].state, 'running');
 });
 
-test('workers use all active tasks and distinguish missing telemetry from actual zero readings', () => {
+test('GPU occupancy includes external users and unknown hardware never means idle', () => {
   const workers = [{ gpu: 0, heartbeat: 100 }, { gpu: 1, heartbeat: 100 }, { gpu: 2, heartbeat: null }];
   const jobs = [
     { id: 1, state: 'running', attempt: { gpu: 0 } },
@@ -88,14 +89,35 @@ test('workers use all active tasks and distinguish missing telemetry from actual
     { id: 3, state: 'succeeded', attempt: { gpu: 1 } },
   ];
   const result = enrichWorkers(workers, jobs, [{
-    gpu: 0, utilization_percent: 0, memory_used_bytes: 0, memory_total_bytes: 24 * 1024 ** 3, updated: 100,
-  }, { gpu: 1, utilization_percent: 101 }]);
+    gpu: 0, utilization_percent: 0, memory_used_bytes: 0, memory_total_bytes: 24 * 1024 ** 3,
+    processes: [{ pid: 10, user: 'other-user', name: 'python', type: 'C' }], updated: 100,
+  }, { gpu: 1, utilization_percent: 101, updated: 100 }, {
+    gpu: 3, utilization_percent: 65, utilization_5m_percent: 50,
+    utilization_window_seconds: 300, updated: 100,
+    processes: [{ pid: 20, user: 'external-user', name: 'renderer', type: 'G' }],
+  }, { gpu: 4, utilization_percent: 0, updated: 100, processes: [] }], 105);
   assert.deepEqual(result[0].job_ids, [250, 1]);
   assert.equal(result[0].state, 'running');
   assert.equal(result[0].metrics.utilization_percent, 0);
   assert.equal(result[0].metrics.memory_used_bytes, 0);
-  assert.equal(result[1].state, 'idle');
+  assert.equal(result[1].state, 'unknown');
   assert.equal(result[1].metrics, null);
   assert.equal(result[2].state, 'unknown');
   assert.equal(result[2].metrics, null);
+  assert.equal(result[3].state, 'running');
+  assert.deepEqual(result[3].job_ids, []);
+  assert.equal(result[3].metrics.processes[0].user, 'external-user');
+  assert.equal(result[3].metrics.utilization_5m_percent, 50);
+  assert.equal(result[4].state, 'idle');
+  const expired = enrichWorkers(workers, jobs, [{ gpu: 0, updated: 100, utilization_percent: 80 }], 131);
+  assert.equal(expired[0].state, 'unknown');
+  assert.equal(expired[0].metrics, null);
+});
+
+test('compact task names retain method identity and explicit aliases', () => {
+  assert.equal(displayName('fv-group-relative-direction-resume100-eq01-dir01-s42'), 'FV 相对方向续训');
+  assert.equal(displayName('fv-group-consistency-resume100-eq01-s42'), 'FV 一致性续训');
+  assert.equal(displayName('other-baseline-s42-e100', ' 方法对比 '), '方法对比');
+  assert.equal(displayName('方法对比'), '方法对比');
+  assert.equal(displayName('other-baseline-s42-e100'), 'other baseline');
 });

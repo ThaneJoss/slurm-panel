@@ -84,6 +84,59 @@ export function progress(value, className = '') {
   return node;
 }
 
+export function progressTrack(value, label, className = '') {
+  if (value != null) {
+    const node = progress(value, className);
+    node.setAttribute('aria-label', label);
+    return node;
+  }
+  const node = el('span', `progress progress-unavailable ${className}`.trim());
+  node.setAttribute('role', 'progressbar');
+  node.setAttribute('aria-label', label);
+  node.setAttribute('aria-valuemin', '0');
+  node.setAttribute('aria-valuemax', '100');
+  node.setAttribute('aria-valuetext', '尚未报告');
+  return node;
+}
+
+export function gpuMemory(metrics) {
+  if (metrics?.memory_used_bytes == null || metrics.memory_total_bytes == null) return '—';
+  return `${formatNumber(metrics.memory_used_bytes / 1024 ** 3, 1)}G/${formatNumber(metrics.memory_total_bytes / 1024 ** 3, 1)}G`;
+}
+
+export function utilizationWindow(metrics) {
+  const seconds = metrics?.utilization_window_seconds;
+  if (seconds == null) return '';
+  return seconds >= 300 ? '5 分钟平均' : seconds >= 60 ? `近 ${formatNumber(seconds / 60, 1)} 分钟平均` : '正在采集 5 分钟均值';
+}
+
+export function gpuProcesses(metrics, className = '') {
+  const processes = metrics?.processes;
+  const details = el('details', `gpu-processes ${className}`.trim());
+  const count = metrics?.process_count;
+  details.append(el('summary', null, count == null ? '进程信息未知' : `${count} 个进程 · 所有用户`));
+  if (!Array.isArray(processes)) {
+    details.append(el('p', 'muted', '尚未提供进程信息'));
+  } else if (processes.length === 0) {
+    details.append(el('p', 'muted', '暂无 GPU 进程'));
+  } else {
+    const list = el('ul', 'gpu-process-list');
+    for (const process of processes) {
+      const item = el('li', 'gpu-process');
+      const name = el('span', 'gpu-process-name', process.name || '未知进程');
+      name.title = process.name || '未知进程';
+      item.append(
+        el('strong', 'gpu-process-user', process.user ?? '未知用户'),
+        name,
+        el('small', 'gpu-process-meta', `PID ${process.pid ?? '—'} · ${process.memory_used_bytes == null ? '显存未知' : `${formatNumber(process.memory_used_bytes / 1024 ** 3, 1)}G`}`),
+      );
+      list.append(item);
+    }
+    details.append(list);
+  }
+  return details;
+}
+
 export async function copyText(text) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);

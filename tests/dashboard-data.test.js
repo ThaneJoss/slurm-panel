@@ -4,6 +4,34 @@ import { chmod, mkdir, stat, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createGpuqStore } from '../src/data/gpuq.js';
 import { createFixture, writeAt } from './fixtures.js';
+import { selectJobs } from '../src/data/query.js';
+
+test('displayed job names are searchable across SQLite history with accurate pagination', async (t) => {
+  const fixture = await createFixture(t);
+  fixture.job({ id: 1, name: 'fv-group-relative-direction-resume100-eq01-s42', state: 'succeeded' });
+  for (let id = 2; id <= 4; id += 1) {
+    fixture.job({ id, name: `technical-${id}-s42`, state: 'succeeded', environment: {
+      PANEL_DISPLAY_NAME: `  Shared comparison ${id}  `, API_TOKEN: 'unsearchable-secret',
+    } });
+  }
+  fixture.finish();
+  const store = createGpuqStore(fixture);
+  t.after(() => store.close());
+  const generated = await store.listJobs({ q: 'FV 相对方向续训' });
+  assert.deepEqual(generated.jobs.map((job) => job.id), [1]);
+  const aliases = await store.listJobs({ q: 'SHARED comparison', page: 2, pageSize: 2 });
+  assert.deepEqual(aliases.jobs.map((job) => job.id), [2]);
+  assert.deepEqual(aliases.pagination, { page: 2, pageSize: 2, total: 3, totalPages: 2 });
+  assert.equal(aliases.summary.total, 4);
+  assert.equal((await store.listJobs({ q: 'technical-2' })).jobs[0].id, 2);
+  assert.equal((await store.listJobs({ q: 'unsearchable-secret' })).pagination.total, 0);
+});
+
+test('in-memory demo selection matches the displayed title as well as the recorded name', () => {
+  const jobs = [{ id: 1, name: 'technical-name-s42', display_name: 'Shared comparison', state: 'running' }];
+  assert.deepEqual(selectJobs(jobs, { q: 'SHARED comparison' }).jobs.map((job) => job.id), [1]);
+  assert.deepEqual(selectJobs(jobs, { q: 'technical-name' }).jobs.map((job) => job.id), [1]);
+});
 
 test('SQLite searches and pages complete history while range statistics and worker tasks remain independent of the page', async (t) => {
   const fixture = await createFixture(t);
@@ -25,7 +53,7 @@ test('SQLite searches and pages complete history while range statistics and work
   assert.deepEqual(last.pagination, { page: 3, pageSize: 100, total: 230, totalPages: 3 });
   assert.equal(last.jobs.at(-1).id, 1);
   assert.deepEqual(last.workers[0].job_ids, [3, 2]);
-  assert.equal(last.workers[0].state, 'running');
+  assert.equal(last.workers[0].state, 'unknown');
 
   const search = await store.listJobs({ q: 'UNIQUE old', state: 'failed' });
   assert.deepEqual(search.jobs.map((job) => job.id), [1]);
@@ -92,8 +120,12 @@ test('scheduler GPU snapshots expose only metric fields and malformed updates st
   const listing = await store.listJobs();
   assert.deepEqual(listing.workers[0].metrics, {
     utilization_percent: 96,
+    utilization_5m_percent: null,
+    utilization_window_seconds: null,
     memory_used_bytes: 18.6 * 1024 ** 3,
     memory_total_bytes: 24 * 1024 ** 3,
+    processes: null,
+    process_count: null,
     updated: fixture.now - 2,
   });
   const serialized = JSON.stringify(listing);
@@ -112,8 +144,12 @@ test('scheduler GPU snapshots expose only metric fields and malformed updates st
   const snapshotUpdated = (await stat(metricsFile)).mtimeMs / 1000;
   assert.deepEqual((await store.listJobs()).workers[0].metrics, {
     utilization_percent: 64,
+    utilization_5m_percent: null,
+    utilization_window_seconds: null,
     memory_used_bytes: 18 * 1024 ** 3,
     memory_total_bytes: 24 * 1024 ** 3,
+    processes: null,
+    process_count: null,
     updated: snapshotUpdated,
   });
 });

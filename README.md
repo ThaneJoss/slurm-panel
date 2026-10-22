@@ -14,14 +14,16 @@
 
 - 任务状态汇总，按名称、任务 ID 和状态筛选。
 - 查看消费者心跳、Slurm 作业 ID、任务尝试历史及退出状态。
-- 展示训练脚本报告的 epoch、batch、更新步数、损失、吞吐与预算进度。
+- 分别展示单个 epoch 和总进度，保留更新步数、损失与吞吐。
+- 面板按实际进度加权计算预计结束时间，近期样本权重更大，后台采样与可选历史持久化不依赖浏览器访问。
+- 展示全机所有用户的 GPU 进程、当前显存及最近 5 分钟平均利用率。
 - 查看队列日志、项目日志，切换来源并跟随更新。
 - 下载完整日志，查看任务关联的产物文件信息。
 - 演示模式模拟取消任务；真实模式可选启用令牌认证后通过 gpuq 请求取消。
 - 定时刷新，适配桌面和手机屏幕。
 - 配置标题、时区及已有 Slurm-web 的跳转地址。
 
-真实模式默认仅查询数据。启用取消操作需要同时设置 `ENABLE_JOB_CONTROL=1` 和 `JOB_CONTROL_TOKEN`；后端通过已有 gpuq 命令请求取消，实际状态随后从队列读取。预算百分比和预算结束时间来自训练脚本，不代表验证和最终评估已经完成。
+真实模式默认仅查询队列数据。启用取消操作需要同时设置 `ENABLE_JOB_CONTROL=1` 和 `JOB_CONTROL_TOKEN`；后端通过已有 gpuq 命令请求取消，实际状态随后从队列读取。预计结束时间注明范围，最终评估耗时未知时不计入完整任务估计；预算百分比或 ETA 归零不代表任务已经完成。
 
 ## 快速开始
 
@@ -70,7 +72,8 @@ pnpm start
 | `HOST` | `127.0.0.1` | HTTP 监听地址 |
 | `PORT` | `5013` | HTTP 端口 |
 | `GPUQ_DATABASE` | 无 | `gpuq` 模式必须配置的数据库绝对路径 |
-| `GPU_METRICS_FILE` | 无 | 调度侧 GPU 指标 JSON 快照的绝对路径 |
+| `GPU_METRICS_FILE` | 无 | 独立采集服务或兼容 exporter 的 GPU 快照绝对路径 |
+| `ETA_STATE_FILE` | 无 | 可选的面板进度采样历史绝对路径，由面板写入 |
 | `PANEL_CLUSTER_NAME` | `SLURM` | 页首集群名称 |
 | `PANEL_TITLE` | `实验进度` | 页面标题 |
 | `SLURM_WEB_URL` | 无 | 可选的 Slurm-web HTTP(S) 地址 |
@@ -86,6 +89,7 @@ pnpm start
 ```text
 src/server/       HTTP 服务、配置与路由
 src/data/         gpuq SQLite 适配器与演示数据适配器
+scripts/          独立的全机 GPU 指标采集服务
 public/           原生 JavaScript、HTML 与 CSS
 examples/         可公开的虚构演示数据
 tests/            Node.js 数据层和 HTTP 接口测试
@@ -119,6 +123,8 @@ gpuq submit --name slurm-panel-browser --cwd /opt/slurm-panel -- pnpm test:brows
 ```
 
 使用调度器日志和任务退出状态确认测试结果。Git 提交和 Pull Request 使用中文说明；提交前确认没有包含真实数据库、日志、环境配置或本机专属部署信息。
+
+独立 GPU 采集服务的安装及持久化状态目录见 [部署说明](docs/deployment.md#gpu-监控与-eta-历史)。新任务使用简短名称；需要保留技术名称时，可通过提交环境的 `PANEL_DISPLAY_NAME` 提供网页短名，原名与命令仍保留。
 
 ## 许可证
 
