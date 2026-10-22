@@ -1,0 +1,24 @@
+[Unit]
+Description=Slurm Panel whole-host GPU metrics
+After=network.target
+
+[Service]
+Type=simple
+User=slurm-panel
+Group=slurm-panel
+WorkingDirectory=/opt/slurm-panel
+Environment=GPU_METRICS_FILE=/var/lib/slurm-panel/gpus.json
+Environment=GPU_METRICS_INTERVAL_MS=5000
+Environment=NVIDIA_SMI_COMMAND=/usr/bin/nvidia-smi
+ExecStart=/usr/bin/node scripts/gpu-metrics.js
+Restart=on-failure
+RestartSec=3
+StateDirectory=slurm-panel
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

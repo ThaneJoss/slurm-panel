@@ -32,6 +32,38 @@ journalctl -u slurm-panel -n 50 --no-pager
 
 模板通过 `EnvironmentFile` 加载配置。默认只读部署中，服务用户需能读取队列与日志。无需重启 Slurm 或 gpuq 消费者来运行面板。
 
+## GPU 监控与 ETA 历史
+
+HTTP 服务只读取监控快照。使用仓库附带的独立 [GPU 采集单元](../deploy/gpu-metrics.service) 时，先按实际环境调整服务用户、工作目录、Node.js 和 `nvidia-smi` 路径。该用户需能读取 NVIDIA 全机状态和 `/proc` 进程归属；采集不按用户名或 gpuq 任务过滤，也不影响调度。
+
+采集单元使用以下变量：
+
+| 变量 | 默认值/要求 | 含义 |
+| --- | --- | --- |
+| `GPU_METRICS_FILE` | 必填绝对路径 | 当前快照及最近采样历史 |
+| `GPU_METRICS_INTERVAL_MS` | `5000` | 采样间隔，毫秒 |
+| `NVIDIA_SMI_COMMAND` | `nvidia-smi` | 独立采集服务使用的可执行文件 |
+
+例如将采集快照写入 `/var/lib/slurm-panel/gpus.json`，在面板 `.env` 中配置同一路径，并可启用 ETA 历史持久化：
+
+```dotenv
+GPU_METRICS_FILE=/var/lib/slurm-panel/gpus.json
+ETA_STATE_FILE=/var/lib/slurm-panel/eta.json
+```
+
+面板与采集器使用相同服务账户读取受限文件，状态目录需对写入它的服务可写。示例单元使用 `StateDirectory=slurm-panel` 创建 `/var/lib/slurm-panel`；自定义路径时相应配置目录权限和 systemd 写入范围。ETA 文件由面板写入，GPU 文件由采集器写入，队列数据库仍只读。
+
+```bash
+sudo cp deploy/gpu-metrics.service /etc/systemd/system/slurm-panel-gpu-metrics.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now slurm-panel-gpu-metrics
+sudo systemctl restart slurm-panel
+```
+
+采集器每 5 秒原子替换快照，显存显示当前占用，利用率按最近 300 秒时间加权平均；不足 5 分钟时页面注明实际采集窗口。采集失败将状态写为不可用，不把旧值或缺失值改为 0。面板将超过 30 秒的快照视为过期。采样历史随快照保存，重启采集器后可继续滚动窗口。
+
+面板在没有访问者时也每 5 秒采集任务进度。`ETA_STATE_FILE` 可选，省略时采样历史仅保存在内存。独立监控不要求在日常提交和任务跟进中手动运行 `gpuq status` 或 GPU 探测。
+
 ## Docker 演示
 
 ```bash

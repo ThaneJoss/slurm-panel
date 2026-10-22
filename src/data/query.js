@@ -1,3 +1,5 @@
+import { progressOf } from './eta.js';
+
 const ACTIVE_STATES = new Set(['assigned', 'launching', 'starting', 'running']);
 const QUEUED_STATES = new Set(['queued', 'waiting_resources']);
 const QUERY_STATES = new Set(['all', 'active', 'queued', 'succeeded', 'failed', 'cancelled']);
@@ -88,6 +90,7 @@ export function enrichJob(job, now = Date.now() / 1000) {
       percent: percent ?? (hasEpochProgress ? Math.min(100, epoch / totalEpochs * 100) : null),
       percent_kind: job.telemetry.percent_kind
         ?? (percent !== null ? 'budget' : hasEpochProgress ? 'epoch' : null),
+      ...progressOf(job.telemetry, totalEpochs),
     };
   }
 
@@ -149,35 +152,50 @@ export function selectJobs(jobs, input = {}, now = Date.now() / 1000) {
   };
 }
 
-function projectMetrics(record) {
-  if (!record) return null;
+function projectMetrics(record, now) {
+  if (!record || !Number.isFinite(record.updated) || now - record.updated > 30) return null;
   let utilization = finiteNumber(record.utilization_percent);
   if (utilization !== null && utilization > 100) utilization = null;
   const memoryTotal = finiteNumber(record.memory_total_bytes);
   let memoryUsed = finiteNumber(record.memory_used_bytes);
   if (memoryTotal !== null && memoryUsed !== null && memoryUsed > memoryTotal) memoryUsed = null;
-  if (utilization === null && memoryTotal === null && memoryUsed === null) return null;
+  const average = finiteNumber(record.utilization_5m_percent);
+  const processes = Array.isArray(record.processes) ? record.processes.map((process) => ({
+    pid: process.pid, user: process.user, name: process.name,
+    type: process.type, memory_used_bytes: finiteNumber(process.memory_used_bytes),
+  })) : null;
+  if (utilization === null && memoryTotal === null && memoryUsed === null && processes === null) return null;
   return {
     utilization_percent: utilization,
+    utilization_5m_percent: average !== null && average <= 100 ? average : null,
+    utilization_window_seconds: finiteNumber(record.utilization_window_seconds),
     memory_used_bytes: memoryUsed,
     memory_total_bytes: memoryTotal,
+    processes,
+    process_count: processes?.length ?? null,
     updated: finiteNumber(record.updated),
   };
 }
 
 /** Worker assignments always use all active jobs, independently of list paging. */
-export function enrichWorkers(workers, allJobs, metrics = []) {
+export function enrichWorkers(workers, allJobs, metrics = [], now = Date.now() / 1000) {
   const metricRecords = new Map(metrics.map((record) => [record.gpu, record]));
-  return workers.map((worker) => {
+  const allWorkers = new Map(workers.map((worker) => [worker.gpu, worker]));
+  for (const record of metrics) {
+    if (!allWorkers.has(record.gpu)) allWorkers.set(record.gpu, { gpu: record.gpu, slurm_job_id: null, heartbeat: null });
+  }
+  return [...allWorkers.values()].sort((left, right) => left.gpu - right.gpu).map((worker) => {
     const jobIds = allJobs
       .filter((job) => ACTIVE_STATES.has(job.state) && job.attempt?.gpu === worker.gpu)
       .map((job) => job.id)
       .sort((left, right) => right - left);
+    const current = projectMetrics(metricRecords.get(worker.gpu), now);
+    const occupied = current && (current.process_count > 0 || current.utilization_percent > 0);
     return {
       ...worker,
       job_ids: jobIds,
-      state: finiteNumber(worker.heartbeat, Number.MIN_VALUE) === null ? 'unknown' : jobIds.length ? 'running' : 'idle',
-      metrics: projectMetrics(metricRecords.get(worker.gpu)),
+      state: occupied ? 'running' : current?.process_count === 0 ? 'idle' : 'unknown',
+      metrics: current,
     };
   });
 }

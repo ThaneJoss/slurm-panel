@@ -25,7 +25,7 @@ test('SQLite searches and pages complete history while range statistics and work
   assert.deepEqual(last.pagination, { page: 3, pageSize: 100, total: 230, totalPages: 3 });
   assert.equal(last.jobs.at(-1).id, 1);
   assert.deepEqual(last.workers[0].job_ids, [3, 2]);
-  assert.equal(last.workers[0].state, 'running');
+  assert.equal(last.workers[0].state, 'unknown');
 
   const search = await store.listJobs({ q: 'UNIQUE old', state: 'failed' });
   assert.deepEqual(search.jobs.map((job) => job.id), [1]);
@@ -92,8 +92,12 @@ test('scheduler GPU snapshots expose only metric fields and malformed updates st
   const listing = await store.listJobs();
   assert.deepEqual(listing.workers[0].metrics, {
     utilization_percent: 96,
+    utilization_5m_percent: null,
+    utilization_window_seconds: null,
     memory_used_bytes: 18.6 * 1024 ** 3,
     memory_total_bytes: 24 * 1024 ** 3,
+    processes: null,
+    process_count: null,
     updated: fixture.now - 2,
   });
   const serialized = JSON.stringify(listing);
@@ -112,8 +116,12 @@ test('scheduler GPU snapshots expose only metric fields and malformed updates st
   const snapshotUpdated = (await stat(metricsFile)).mtimeMs / 1000;
   assert.deepEqual((await store.listJobs()).workers[0].metrics, {
     utilization_percent: 64,
+    utilization_5m_percent: null,
+    utilization_window_seconds: null,
     memory_used_bytes: 18 * 1024 ** 3,
     memory_total_bytes: 24 * 1024 ** 3,
+    processes: null,
+    process_count: null,
     updated: snapshotUpdated,
   });
 });

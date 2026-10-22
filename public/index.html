@@ -29,9 +29,9 @@
       </div>
       <section class="workers card" aria-labelledby="workers-title">
         <div class="workers-heading">
-          <h2 id="workers-title"><span id="workers-icon" aria-hidden="true"></span>GPU 执行器</h2>
+          <h2 id="workers-title"><span id="workers-icon" aria-hidden="true"></span>全机 GPU</h2>
           <span id="workers-summary" class="muted">正在读取记录…</span>
-          <button id="workers-toggle" class="icon-button" type="button" aria-label="收起 GPU 执行器" aria-expanded="true" aria-controls="workers"></button>
+          <button id="workers-toggle" class="icon-button" type="button" aria-label="收起全机 GPU" aria-expanded="true" aria-controls="workers"></button>
         </div>
         <div id="workers"></div>
       </section>
@@ -50,7 +50,7 @@
         </section>
         <section id="detail" class="detail card" aria-label="任务详情" aria-busy="false"><p class="empty">选择一个任务，查看进度与日志</p></section>
       </div>
-      <footer><span id="time-zone-note"></span><span>进度、吞吐与预计剩余时间由训练脚本报告；预算结束不表示验证和最终评估已经完成。</span></footer>
+      <footer><span id="time-zone-note"></span><span>预计结束时间按实际进度加权计算；详情注明估计范围，完成状态以队列记录为准。</span></footer>
     </main>
     <noscript><p class="empty">请启用 JavaScript 以查看任务与日志。</p></noscript>
     <script type="module" src="/app.js"></script>

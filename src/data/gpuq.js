@@ -1,14 +1,17 @@
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { directoryCandidates, fileInfo, outputDirectories, progressFile, tail } from './files.js';
 import { artifactMetadata } from './artifacts.js';
 import { enrichJob, enrichWorkers, parseQuery } from './query.js';
 import { readGpuMetrics } from './metrics.js';
+import { createProgressEstimator } from './eta.js';
+import { displayName } from './names.js';
 
 const JOB_COLUMNS = 'id, name, argv, cwd, state, created, updated, attempt_count, message';
 const ATTEMPT_COLUMNS = `id, job_id, number, gpu, state, slurm_job_id, log_path,
   created, started, finished, exit_code, message`;
-const PROGRESS_KEYS = ['progress_percent', 'updates', 'epoch', 'phase'];
+const PROGRESS_KEYS = ['progress_percent', 'updates', 'step', 'epoch', 'current_epoch', 'completed_epochs', 'phase'];
 const ACTIVE = ['assigned', 'launching', 'starting', 'running'];
 const RANGE_SECONDS = { '24h': 86400, '7d': 604800, '30d': 2592000 };
 
@@ -16,6 +19,7 @@ function decodeJob(row) {
   const { environment, ...job } = row;
   job.argv = JSON.parse(job.argv);
   const submitted = JSON.parse(environment);
+  job.display_name = displayName(job.name, submitted.PANEL_DISPLAY_NAME);
   // Only output directory hints are needed; submitted secrets stay out of the API.
   const outputs = {};
   for (const key of ['V6B_OUTPUT', 'OUTPUT_DIR', 'RUN_DIR', 'TRAIN_OUTPUT_DIR']) {
@@ -34,16 +38,20 @@ function normalizedProgress(record, source, updated, updatedSource) {
   return {
     phase: record.state ?? record.phase ?? null,
     epoch: record.epoch ?? record.completed_epoch ?? null,
+    completed_epochs: record.completed_epochs ?? record.completed_epoch ?? null,
+    current_epoch: record.current_epoch ?? null,
     total_epochs: record.total_epochs ?? record.epochs ?? record.max_epochs ?? null,
     batch: record.batch ?? null,
     batches: record.batches ?? record.updates_per_epoch ?? null,
-    updates: record.updates ?? latest.updates ?? null,
+    updates: record.updates ?? record.step ?? latest.updates ?? null,
+    total_updates: record.total_updates ?? record.planned_steps ?? null,
     samples: record.samples ?? latest.samples ?? null,
     percent: record.progress_percent ?? null,
     percent_kind: record.progress_percent == null ? null : (record.percent_kind ?? 'budget'),
     eta_seconds: record.eta_seconds ?? record.estimated_remaining_seconds ?? null,
+    final_evaluation_seconds: record.final_evaluation_seconds ?? null,
     loss:
-      record.latest_loss ?? record.latest_micro_loss ?? record.latest_losses?.loss ?? latest.train_loss ?? null,
+      record.latest_loss ?? record.loss ?? record.latest_micro_loss ?? record.latest_losses?.loss ?? latest.train_loss ?? null,
     images_per_second: record.training_images_per_second ?? null,
     budget_end: record.estimated_budget_end_at ?? record.deadline_at ?? null,
     updated,
@@ -61,12 +69,13 @@ function progressRecordTime(record, created) {
   return Number.isFinite(timestamp) && timestamp >= created ? timestamp : null;
 }
 
-async function telemetry(job, attempt, directories, logObservations) {
+async function telemetry(job, attempt, directories, logObservations, observe) {
   const sources = [];
   if (attempt) {
     const result = await tail(attempt.log_path, 128 * 1024);
     if (result.updated !== null && result.updated >= job.created) {
-      for (const line of result.text.split('\n').reverse()) {
+      const records = [];
+      for (const line of result.text.split('\n')) {
         if (!line.startsWith('{')) continue;
         let record;
         try {
@@ -82,18 +91,25 @@ async function telemetry(job, attempt, directories, logObservations) {
           PROGRESS_KEYS.some((key) => Object.hasOwn(record, key)) &&
           belongsToJob(record, job)
         ) {
-          const key = `${job.id}:${attempt.number}:${attempt.log_path}`;
-          const content = JSON.stringify(record);
-          const previous = logObservations.get(key);
           const recordTime = progressRecordTime(record, job.created);
-          const observation = recordTime !== null
-            ? { content, updated: recordTime, updatedSource: 'record' }
-            : previous?.content === content ? previous
-              : { content, updated: Date.now() / 1000, updatedSource: 'observed' };
-          logObservations.set(key, observation);
-          sources.push({ record, source: attempt.log_path, ...observation });
-          break;
+          if (recordTime !== null) {
+            observe(normalizedProgress(record, attempt.log_path, recordTime, 'record'));
+          }
+          records.push(record);
         }
+      }
+      const record = records.at(-1);
+      if (record) {
+        const key = `${job.id}:${attempt.number}:${attempt.log_path}`;
+        const content = JSON.stringify(record);
+        const previous = logObservations.get(key);
+        const recordTime = progressRecordTime(record, job.created);
+        const observation = recordTime !== null
+          ? { content, updated: recordTime, updatedSource: 'record' }
+          : previous?.content === content ? previous
+            : { content, updated: Date.now() / 1000, updatedSource: 'observed' };
+        logObservations.set(key, observation);
+        sources.push({ record, source: attempt.log_path, ...observation });
       }
     }
   }
@@ -138,9 +154,15 @@ async function logSources(job, attempts, directories, environment) {
 }
 
 /** Read the gpuq schema directly, without importing or invoking its scheduler. */
-export function createGpuqStore({ databasePath, metricsFile = null }) {
+export function createGpuqStore({ databasePath, metricsFile = null, etaStateFile = null }) {
   const database = new DatabaseSync(databasePath, { readOnly: true });
   const logObservations = new Map();
+  let estimator = createProgressEstimator();
+  const ready = etaStateFile ? progressFile(etaStateFile).then((saved) => {
+    if (Array.isArray(saved?.record.histories)) {
+      estimator = createProgressEstimator({ state: saved.record.histories });
+    }
+  }) : Promise.resolve();
   database.exec('PRAGMA query_only = ON; PRAGMA busy_timeout = 3000;');
   const activeJobsQuery = database.prepare(`SELECT ${JOB_COLUMNS}, environment FROM jobs
     WHERE state IN ('assigned', 'launching', 'starting', 'running') ORDER BY id DESC`);
@@ -155,7 +177,29 @@ export function createGpuqStore({ databasePath, metricsFile = null }) {
   const metaQuery = database.prepare("SELECT key, value FROM meta WHERE key IN ('paused', 'manager_heartbeat')");
 
   async function publicJob(job, attempt, directories) {
-    return enrichJob({ ...job, attempt: attempt ?? null, telemetry: await telemetry(job, attempt, directories, logObservations) });
+    await ready;
+    const preparedJob = (progress) => enrichJob(estimator.prepare({ ...job, attempt: attempt ?? null, telemetry: progress }));
+    const observe = (progress) => estimator.observe(preparedJob(progress));
+    const progress = await telemetry(job, attempt, directories, logObservations, observe);
+    const enriched = preparedJob(progress);
+    estimator.observe(enriched);
+    return { ...enriched, estimate: estimator.estimate(enriched) };
+  }
+
+  /** Called by the server timer so measurements do not depend on an open browser. */
+  async function sampleProgress() {
+    await ready;
+    const rows = activeJobsQuery.all().map((row) => ({ ...decodeJob(row), attempt: latestAttempt.get(row.id) }));
+    estimator.retain(rows.map(({ job }) => job.id));
+    await Promise.all(rows.map(async ({ job, environment, attempt }) => (
+      publicJob(job, attempt, await outputDirectories(job, environment))
+    )));
+    if (etaStateFile) {
+      await mkdir(dirname(etaStateFile), { recursive: true });
+      const temporary = `${etaStateFile}.tmp`;
+      await writeFile(temporary, JSON.stringify({ histories: estimator.snapshot() }), { mode: 0o600 });
+      await rename(temporary, etaStateFile);
+    }
   }
 
   async function listJobs(options = {}) {
@@ -271,5 +315,5 @@ export function createGpuqStore({ databasePath, metricsFile = null }) {
     return artifactMetadata(job, environment);
   }
 
-  return { listJobs, getJob, getLog, getLogSource, getArtifacts, close: () => database.close() };
+  return { listJobs, getJob, getLog, getLogSource, getArtifacts, sampleProgress, close: () => database.close() };
 }

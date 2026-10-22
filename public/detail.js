@@ -1,5 +1,6 @@
 import {
-  el, icon, formatNumber, formatDuration, formatDate, stateBadge, progress, copyText,
+  el, icon, formatNumber, formatDuration, formatDate, stateBadge, progress, progressTrack, copyText,
+  gpuMemory, utilizationWindow, gpuProcesses,
 } from './dom.js';
 
 const tabs = [
@@ -255,7 +256,8 @@ export function createDetailPanel({ container, getConfig, getSnapshot, api, onRe
   function renderHeader() {
     const header = el('header', 'detail-header');
     const top = el('div', 'detail-heading');
-    const title = el('h2', null, `#${job.id} · ${job.name}`);
+    const title = el('h2', null, `#${job.id} · ${job.display_name || job.name}`);
+    title.title = job.name;
     const more = iconButton('查看任务信息', 'more');
     more.dataset.focusKey = 'more';
     more.addEventListener('click', showInformation);
@@ -309,41 +311,48 @@ export function createDetailPanel({ container, getConfig, getSnapshot, api, onRe
 
   function progressCard() {
     const telemetry = job.telemetry;
+    const totalByUpdates = telemetry?.updates != null && telemetry?.total_updates > 0;
     const section = el('section', 'detail-section progress-card');
-    section.append(el('h3', null, telemetry?.percent_kind === 'budget' ? '训练预算进度' : '训练进度'));
-    const statistics = el('div', 'detail-progress-statistics');
-    const value = el('div', 'detail-progress-value');
-    if (telemetry?.epoch != null && telemetry.total_epochs != null) {
-      value.append(
-        el('strong', null, formatNumber(telemetry.epoch, 0)),
-        el('span', null, `/ ${formatNumber(telemetry.total_epochs, 0)}`),
-        el('small', null, 'epochs'),
-      );
-    } else if (telemetry?.updates != null) {
-      value.append(el('strong', null, formatNumber(telemetry.updates, 0)), el('small', null, '更新步数'));
-    } else {
-      value.append(el('span', 'detail-progress-unavailable', '尚未报告进度'));
-    }
-    statistics.append(value);
-    if (telemetry?.percent != null) {
-      statistics.append(el('strong', 'detail-percent', `${formatNumber(telemetry.percent, 0)}%`));
-    }
-    section.append(statistics);
-    if (telemetry?.percent != null) {
-      const bar = progress(telemetry.percent, 'detail-progress-bar');
-      bar.setAttribute('aria-label', telemetry.percent_kind === 'budget' ? '脚本训练预算进度' : '脚本报告进度');
-      section.append(bar);
+    section.append(el('h3', null, '训练进度'));
+    for (const [kind, label, percent, completed, total, unit] of [
+      ['epoch', '单轮进度', telemetry?.epoch_percent, telemetry?.batch, telemetry?.batches, 'batches'],
+      ['total', '总进度', telemetry?.total_percent,
+        totalByUpdates ? telemetry.updates : telemetry?.completed_epochs ?? telemetry?.epoch,
+        totalByUpdates ? telemetry.total_updates : telemetry?.total_epochs, totalByUpdates ? '步' : 'epochs'],
+    ]) {
+      const row = el('div', `detail-progress-reading ${kind}-progress`);
+      row.append(el('h4', null, label));
+      const statistics = el('div', 'detail-progress-statistics');
+      const value = el('div', 'detail-progress-value');
+      if (completed != null && total != null) {
+        value.append(
+          el('strong', null, formatNumber(completed, 0)),
+          el('span', null, `/ ${formatNumber(total, 0)}`),
+          el('small', null, unit),
+        );
+      } else value.append(el('span', 'detail-progress-unavailable', '尚未报告'));
+      statistics.append(value, el('strong', 'detail-percent', percent == null ? '—' : `${formatNumber(percent, 0)}%`));
+      row.append(statistics, progressTrack(percent, label, 'detail-progress-bar'));
+      section.append(row);
     }
     const metadata = el('div', 'detail-progress-meta');
     metadata.append(el('span', null, `阶段：${telemetry?.phase ?? '未报告'}`));
     const seconds = elapsed(job.attempt);
     metadata.append(el('span', null, seconds === null ? '尚未开始' : `已运行 ${formatDuration(seconds)}`));
-    metadata.append(el('span', null, telemetry?.eta_seconds != null
-      ? `脚本预计剩余 ≈ ${formatDuration(telemetry.eta_seconds)}`
-      : '脚本预计剩余 —'));
     section.append(metadata);
-    if (telemetry?.percent_kind === 'budget') {
-      section.append(el('p', 'detail-progress-note', '百分比为脚本报告的训练预算进度，不代表验证或最终评估已经完成。'));
+    const estimate = job.estimate;
+    const estimated = el('div', 'detail-estimate');
+    const estimateLabel = estimate?.scope === 'training_and_periodic_validation' ? '训练预计结束' : '预计结束';
+    estimated.append(el('span', 'detail-estimate-label', estimateLabel));
+    if (estimate?.end_at != null) {
+      estimated.append(el('strong', null, formatDate(estimate.end_at, config())));
+      estimated.append(el('span', 'detail-estimate-remaining', `约剩 ${formatDuration(estimate.remaining_seconds)}`));
+    } else estimated.append(el('span', 'muted', ['succeeded', 'failed', 'cancelled'].includes(job.state) ? '任务已结束' : '等待进度样本'));
+    section.append(estimated);
+    if (estimate?.scope === 'training_and_periodic_validation') {
+      section.append(el('p', 'detail-progress-note', '包含训练与常规验证，最终评估时间尚未计入。'));
+    } else if (estimate?.scope === 'full_task') {
+      section.append(el('p', 'detail-progress-note', '包含训练、常规验证与最终评估。'));
     }
     const start = el('p', 'detail-start-time', `开始时间　${formatDate(job.attempt?.started, config())}`);
     section.append(start);
@@ -359,26 +368,31 @@ export function createDetailPanel({ container, getConfig, getSnapshot, api, onRe
     const metrics = worker?.metrics;
     section.append(heading);
     if (!metrics) {
-      section.append(el('p', 'metrics-unavailable', gpu == null ? '尚未分配 GPU。' : '调度侧尚未提供 GPU 指标。'));
+      section.append(el('p', 'metrics-unavailable', gpu == null ? '尚未分配 GPU。' : 'GPU 指标暂不可用。'));
       return section;
     }
     const fields = el('div', 'gpu-metric-fields');
     const utilization = el('div', 'gpu-metric');
     utilization.append(icon('chip'), el('span', null, '利用率'));
-    if (metrics.utilization_percent != null) {
-      utilization.append(progress(metrics.utilization_percent, 'metric-progress'));
-      utilization.append(el('strong', 'metric-utilization', `${formatNumber(metrics.utilization_percent, 0)}%`));
-    } else utilization.append(el('span', 'muted', '未提供'));
+    utilization.title = utilizationWindow(metrics) || '尚未提供 5 分钟平均利用率';
+    if (metrics.utilization_5m_percent != null) {
+      const bar = progress(metrics.utilization_5m_percent, 'metric-progress');
+      bar.setAttribute('aria-label', 'GPU 平均利用率');
+      utilization.append(bar, el('strong', 'metric-utilization', `${formatNumber(metrics.utilization_5m_percent, 0)}%`));
+    } else utilization.append(el('span', 'muted', '—'));
     const memory = el('div', 'gpu-metric');
     memory.append(icon('database'), el('span', null, '显存'));
     if (metrics.memory_used_bytes != null && metrics.memory_total_bytes != null) {
       if (metrics.memory_total_bytes > 0) {
         memory.append(progress(metrics.memory_used_bytes / metrics.memory_total_bytes * 100, 'metric-progress'));
       }
-      memory.append(el('strong', null, `${formatNumber(metrics.memory_used_bytes / 1024 ** 3, 1)} / ${formatNumber(metrics.memory_total_bytes / 1024 ** 3, 0)} GiB`));
-    } else memory.append(el('span', 'muted', '未提供'));
-    fields.append(utilization, memory);
-    section.append(fields, el('p', 'metrics-updated', `调度侧指标更新：${formatDate(metrics.updated, config())}`));
+      memory.append(el('strong', null, gpuMemory(metrics)));
+    } else memory.append(el('span', 'muted', '—'));
+    fields.append(memory, utilization);
+    const previous = container.querySelector('.gpu-metrics-card .gpu-processes');
+    const processes = gpuProcesses(metrics);
+    processes.open = previous?.open ?? false;
+    section.append(fields, el('p', 'metrics-updated', `${utilizationWindow(metrics) || '平均利用率尚未提供'} · 更新 ${formatDate(metrics.updated, config())}`), processes);
     return section;
   }
 
