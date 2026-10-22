@@ -30,6 +30,15 @@ export function createDemoStore() {
       messages,
     };
   });
+  const artifacts = new Map(jobs.map((job) => {
+    const directories = outputCandidates(job, {});
+    const files = ['running', 'succeeded'].includes(job.state) ? directories.flatMap((directory) => [
+      { name: 'status.json', path: join(directory, 'status.json'), size: 1536, modified: job.updated },
+      { name: 'best.pt', path: join(directory, 'best.pt'), size: 24 * 1024 ** 2, modified: job.updated - 30 },
+    ]) : [];
+    return [job.id, { directories, files, truncated: false }];
+  }));
+
   function listJobs(options = {}) {
     const timestamp = Date.now() / 1000;
     const all = jobs.map(({ attempts, logs, messages, ...job }) => enrichJob(job, timestamp));
@@ -66,14 +75,8 @@ export function createDemoStore() {
   }
 
   function getArtifacts(id) {
-    const job = jobs.find((item) => item.id === id);
-    if (!job) return null;
-    const directories = outputCandidates(job, {});
-    const files = ['running', 'succeeded'].includes(job.state) ? directories.flatMap((directory) => [
-      { name: 'status.json', path: join(directory, 'status.json'), size: 1536, modified: job.updated },
-      { name: 'best.pt', path: join(directory, 'best.pt'), size: 24 * 1024 ** 2, modified: job.updated - 30 },
-    ]) : [];
-    return { directories, files, truncated: false };
+    const result = artifacts.get(id);
+    return result ? structuredClone(result) : null;
   }
 
   function cancelJob(id) {

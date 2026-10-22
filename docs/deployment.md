@@ -30,7 +30,7 @@ sudo systemctl enable --now slurm-panel
 journalctl -u slurm-panel -n 50 --no-pager
 ```
 
-模板通过 `EnvironmentFile` 加载配置。服务用户需能读取队列与日志；其权限不应包含任务调度管理权限。无需重启 Slurm 或 gpuq 消费者来运行面板。
+模板通过 `EnvironmentFile` 加载配置。默认只读部署中，服务用户需能读取队列与日志。无需重启 Slurm 或 gpuq 消费者来运行面板。
 
 ## Docker 演示
 
@@ -61,6 +61,21 @@ docker run -d --name slurm-panel \
 ```
 
 任务产物分布在其他目录时，逐一添加保留绝对路径的只读挂载。`--user` 应对应有读取权限的 UID/GID；数据库和日志由其他用户组管理时，还需要配置相应的只读访问权限。不要为了面板而放开整个队列目录的写权限。
+
+## 启用真实任务取消
+
+演示模式中的取消操作仅修改虚构数据。接入真实队列后，面板默认保持只读；只有需要由面板取消任务时才设置：
+
+```dotenv
+ENABLE_JOB_CONTROL=1
+JOB_CONTROL_TOKEN=replace-with-your-operator-token
+GPUQ_COMMAND=/usr/local/bin/gpuq
+PANEL_PUBLIC_ORIGIN=https://panel.example.com
+```
+
+令牌通过部署环境提供，不能提交到仓库。服务用户必须已有取消目标 gpuq 任务的权限，且 `GPUQ_COMMAND` 指向现有命令；后端调用固定参数 `gpuq cancel <任务 ID>`，不经 shell 执行。HTTP 成功响应只说明取消请求已提交，界面随后根据队列记录显示实际状态。
+
+默认 Docker 镜像包含面板程序和演示数据。若要在容器里启用真实取消，还需要自行提供可用的 gpuq CLI 及其已有调度环境；单独只读挂载数据库不能赋予取消能力。宿主机已有 gpuq 时可使用 Node.js/systemd 部署。
 
 ## 发布源码
 

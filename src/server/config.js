@@ -36,6 +36,26 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
   }
   const timeZone = env.TZ || null;
   if (timeZone) new Intl.DateTimeFormat('en', { timeZone });
+  if (env.ENABLE_JOB_CONTROL && !['0', '1'].includes(env.ENABLE_JOB_CONTROL)) {
+    throw new Error('ENABLE_JOB_CONTROL must be 0 or 1');
+  }
+  const jobControlEnabled = env.ENABLE_JOB_CONTROL === '1';
+  const jobControlToken = env.JOB_CONTROL_TOKEN || null;
+  if (mode === 'gpuq' && jobControlEnabled && !jobControlToken) {
+    throw new Error('JOB_CONTROL_TOKEN is required when job control is enabled');
+  }
+  if (jobControlToken && !/^[\x21-\x7e]+$/.test(jobControlToken)) {
+    throw new Error('JOB_CONTROL_TOKEN must contain printable characters without whitespace');
+  }
+  let publicOrigin = null;
+  if (env.PANEL_PUBLIC_ORIGIN) {
+    const url = new URL(env.PANEL_PUBLIC_ORIGIN);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+      || url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('PANEL_PUBLIC_ORIGIN must be an HTTP(S) origin without a path or credentials');
+    }
+    publicOrigin = url.origin;
+  }
 
   return Object.freeze({
     host: env.HOST || '127.0.0.1',
@@ -48,11 +68,22 @@ export function readConfig(env = process.env, args = process.argv.slice(2)) {
     slurmWebUrl,
     timeZone,
     refreshIntervalMs: positiveInteger(env.REFRESH_INTERVAL_MS, 'REFRESH_INTERVAL_MS', 5000),
-    capabilities: Object.freeze({ cancelJobs: false, cancellationRequiresToken: false, artifacts: false, logDownload: false }),
+    jobControlEnabled,
+    jobControlToken,
+    gpuqCommand: env.GPUQ_COMMAND || 'gpuq',
+    publicOrigin,
   });
 }
 
 export function publicConfig(config) {
-  const { title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode, capabilities } = config;
-  return { title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode, capabilities };
+  const { title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode } = config;
+  return {
+    title, clusterName, slurmWebUrl, refreshIntervalMs, timeZone, mode,
+    capabilities: {
+      cancelJobs: mode === 'demo' || config.jobControlEnabled,
+      cancellationRequiresToken: mode !== 'demo' && config.jobControlEnabled,
+      artifacts: true,
+      logDownload: true,
+    },
+  };
 }
