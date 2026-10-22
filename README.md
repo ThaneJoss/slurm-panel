@@ -66,7 +66,9 @@ pnpm start
 | `HOST` | `127.0.0.1` | HTTP 监听地址 |
 | `PORT` | `5013` | HTTP 端口 |
 | `GPUQ_DATABASE` | 无 | `gpuq` 模式必须配置的数据库绝对路径 |
-| `PANEL_TITLE` | `Slurm Panel` | 页面标题 |
+| `GPU_METRICS_FILE` | 无 | 调度侧 GPU 指标 JSON 快照的绝对路径 |
+| `PANEL_CLUSTER_NAME` | `SLURM` | 页首集群名称 |
+| `PANEL_TITLE` | `实验进度` | 页面标题 |
 | `SLURM_WEB_URL` | 无 | 可选的 Slurm-web HTTP(S) 地址 |
 | `TZ` | 无 | 可选 IANA 时区；未设置时前端使用浏览器时区 |
 | `REFRESH_INTERVAL_MS` | `5000` | 自动刷新间隔，毫秒 |

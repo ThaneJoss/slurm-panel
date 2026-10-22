@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { outputCandidates } from './files.js';
+import { enrichJob, enrichWorkers, selectJobs } from './query.js';
 
 /** A self-contained, entirely fictional queue for trying the UI. */
 export function createDemoStore() {
@@ -27,17 +30,18 @@ export function createDemoStore() {
       messages,
     };
   });
-  const counts = {};
-  for (const job of jobs) counts[job.state] = (counts[job.state] ?? 0) + 1;
-
-  function listJobs() {
+  function listJobs(options = {}) {
+    const timestamp = Date.now() / 1000;
+    const all = jobs.map(({ attempts, logs, messages, ...job }) => enrichJob(job, timestamp));
+    const metrics = (fixture.gpu_metrics ?? []).map(({ updatedAgo, ...record }) => ({
+      ...record, updated: now - updatedAgo,
+    }));
     return structuredClone({
-      jobs: jobs.map(({ attempts, logs, messages, ...job }) => job),
-      workers: fixture.workers.map((worker) => ({ ...worker, heartbeat: Date.now() / 1000 - 2 })),
-      counts,
+      ...selectJobs(all, options, timestamp),
+      workers: enrichWorkers(fixture.workers.map((worker) => ({ ...worker, heartbeat: timestamp - 2 })), all, metrics),
       paused: false,
       manager_heartbeat: Date.now() / 1000 - 1,
-      now: Date.now() / 1000,
+      now: timestamp,
     });
   }
 
@@ -45,7 +49,7 @@ export function createDemoStore() {
     const result = jobs.find((job) => job.id === id);
     if (!result) return null;
     const { messages, ...job } = result;
-    return structuredClone(job);
+    return structuredClone(enrichJob(job));
   }
 
   function getLog(id, key) {
@@ -55,5 +59,37 @@ export function createDemoStore() {
     return { text: source.text, updated: job.updated, path: source.path };
   }
 
-  return { listJobs, getJob, getLog, close() {} };
+  function getLogSource(id, key) {
+    const job = jobs.find((item) => item.id === id);
+    const source = job?.logs.find((item) => item.key === key);
+    return source ? structuredClone(source) : null;
+  }
+
+  function getArtifacts(id) {
+    const job = jobs.find((item) => item.id === id);
+    if (!job) return null;
+    const directories = outputCandidates(job, {});
+    const files = ['running', 'succeeded'].includes(job.state) ? directories.flatMap((directory) => [
+      { name: 'status.json', path: join(directory, 'status.json'), size: 1536, modified: job.updated },
+      { name: 'best.pt', path: join(directory, 'best.pt'), size: 24 * 1024 ** 2, modified: job.updated - 30 },
+    ]) : [];
+    return { directories, files, truncated: false };
+  }
+
+  function cancelJob(id) {
+    const job = jobs.find((item) => item.id === id);
+    if (!job) return null;
+    if (['assigned', 'launching', 'starting', 'running', 'queued', 'waiting_resources'].includes(job.state)) {
+      job.state = 'cancelled';
+      job.updated = Date.now() / 1000;
+      job.message = '此演示任务已取消';
+      if (job.attempt) {
+        job.attempt.state = 'cancelled';
+        job.attempt.finished = job.updated;
+      }
+    }
+    return getJob(id);
+  }
+
+  return { listJobs, getJob, getLog, getLogSource, getArtifacts, cancelJob, close() {} };
 }

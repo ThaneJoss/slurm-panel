@@ -1,5 +1,7 @@
 # Slurm Panel
 
+The dashboard queries complete queue history with server-side filtering, sorting and pagination. Worker assignments cover all active jobs. Optional `GPU_METRICS_FILE` snapshots are exported by the scheduler; the backend does not probe GPU hardware. Set `PANEL_CLUSTER_NAME` for cluster branding and `PANEL_TITLE` for the page title (default: `实验进度`). See [data integration](docs/data-source.md) for snapshot formats and progress timestamp semantics.
+
 ![Slurm Panel with fictional demo data](docs/assets/demo.png)
 
 [简体中文](README.md)

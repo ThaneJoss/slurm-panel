@@ -42,9 +42,11 @@ export function createApp({ config, store, logger = console }) {
       return;
     }
 
+    let url;
     let pathname;
     try {
-      pathname = new URL(request.url, 'http://localhost').pathname;
+      url = new URL(request.url, 'http://localhost');
+      pathname = url.pathname;
     } catch {
       send(request, response, 400, { error: 'Invalid request URL.' });
       return;
@@ -66,7 +68,7 @@ export function createApp({ config, store, logger = console }) {
         return;
       }
       if (pathname === '/api/jobs') {
-        send(request, response, 200, await store.listJobs());
+        send(request, response, 200, await store.listJobs(url.searchParams));
         return;
       }
 
@@ -79,6 +81,10 @@ export function createApp({ config, store, logger = console }) {
       }
       send(request, response, 404, { error: 'Not found.' });
     } catch (error) {
+      if (error.statusCode === 400) {
+        send(request, response, 400, { error: error.message });
+        return;
+      }
       logger.error('Dashboard request failed:', error);
       send(request, response, 503, { error: 'Unable to read dashboard data. See the server log.' });
     }

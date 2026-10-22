@@ -67,7 +67,7 @@ export async function progressFile(path) {
   }
 }
 
-export function directoryCandidates(job, environment) {
+export function outputCandidates(job, environment) {
   const candidates = [];
   for (const key of OUTPUT_VARIABLES) {
     if (environment[key]) candidates.push(environment[key]);
@@ -80,6 +80,13 @@ export function directoryCandidates(job, environment) {
     for (const option of OUTPUT_OPTIONS) {
       if (arg.startsWith(`${option}=`)) candidates.push(arg.slice(option.length + 1));
     }
+  }
+  return [...new Set(candidates.map((path) => resolve(job.cwd, path)))];
+}
+
+export function directoryCandidates(job, environment) {
+  const candidates = outputCandidates(job, environment);
+  for (const arg of job.argv) {
     if (isAbsolute(arg) && arg.endsWith('.sh')) candidates.push(dirname(arg));
   }
   candidates.push(job.cwd);

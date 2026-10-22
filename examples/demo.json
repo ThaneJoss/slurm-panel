@@ -1,28 +1,108 @@
 {
   "workers": [
-    { "gpu": 0, "slurm_job_id": "demo-worker-01" },
-    { "gpu": 1, "slurm_job_id": "demo-worker-02" }
+    {
+      "gpu": 0,
+      "slurm_job_id": "demo-worker-01"
+    },
+    {
+      "gpu": 1,
+      "slurm_job_id": "demo-worker-02"
+    },
+    {
+      "gpu": 2,
+      "slurm_job_id": "demo-worker-03"
+    },
+    {
+      "gpu": 3,
+      "slurm_job_id": "demo-worker-04"
+    },
+    {
+      "gpu": 4,
+      "slurm_job_id": "demo-worker-05"
+    },
+    {
+      "gpu": 5,
+      "slurm_job_id": "demo-worker-06"
+    },
+    {
+      "gpu": 6,
+      "slurm_job_id": "demo-worker-07"
+    },
+    {
+      "gpu": 7,
+      "slurm_job_id": "demo-worker-08"
+    }
   ],
   "jobs": [
     {
-      "id": 4,
-      "name": "语义分割 · 小型示例",
-      "argv": ["node", "train.mjs", "--output", "/demo/runs/segmentation"],
+      "id": 7,
+      "name": "学习率搜索实验",
+      "argv": [
+        "node",
+        "inspect.mjs",
+        "--output",
+        "/demo/runs/inspection"
+      ],
+      "cwd": "/demo/projects/inspection",
+      "state": "cancelled",
+      "createdAgo": 6000,
+      "updatedAgo": 4500,
+      "message": "演示数据：用户取消了此任务",
+      "attempts": [
+        {
+          "id": 7,
+          "number": 1,
+          "gpu": 5,
+          "state": "cancelled",
+          "slurm_job_id": "demo-worker-06",
+          "log_path": "/demo/queue/jobs/7/attempt-1.log",
+          "createdAgo": 5900,
+          "startedAgo": 5880,
+          "finishedAgo": 4500,
+          "exit_code": null,
+          "message": "用户取消了此演示任务"
+        }
+      ],
+      "telemetry": null,
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 5",
+          "path": "/demo/queue/jobs/7/attempt-1.log",
+          "text": "[demo] 学习率搜索示例\n[demo] 此演示任务已由用户取消。\n"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "余弦调度消融实验",
+      "argv": [
+        "node",
+        "train.mjs",
+        "--output",
+        "/demo/runs/experiment-6",
+        "--stride",
+        "1",
+        "--seed",
+        "43",
+        "--epochs",
+        "90"
+      ],
       "cwd": "/demo/projects/segmentation",
       "state": "running",
-      "createdAgo": 4200,
-      "updatedAgo": 3,
+      "createdAgo": 7980,
+      "updatedAgo": 660,
       "message": "演示数据：训练进行中",
       "attempts": [
         {
-          "id": 4,
+          "id": 6,
           "number": 1,
-          "gpu": 0,
+          "gpu": 3,
           "state": "running",
-          "slurm_job_id": "demo-worker-01",
-          "log_path": "/demo/queue/jobs/4/attempt-1.log",
-          "createdAgo": 4000,
-          "startedAgo": 3900,
+          "slurm_job_id": "demo-worker-04",
+          "log_path": "/demo/queue/jobs/6/attempt-1.log",
+          "createdAgo": 7740,
+          "startedAgo": 7680,
           "finishedAgo": null,
           "exit_code": null,
           "message": ""
@@ -35,31 +115,170 @@
         "batches": 120,
         "updates": 1400,
         "samples": 22400,
-        "percent": 56,
+        "percent": 13.333333333333334,
         "loss": 0.1842,
         "images_per_second": 48.6,
         "budget_end": null,
-        "source": "/demo/runs/segmentation/status.json"
+        "source": "/demo/runs/experiment-6/status.json",
+        "total_epochs": 90,
+        "percent_kind": "epoch",
+        "eta_seconds": null
       },
       "logs": [
         {
           "key": "attempt-1",
-          "label": "尝试 1 · GPU 0",
-          "path": "/demo/queue/jobs/4/attempt-1.log",
-          "text": "[demo] 启动语义分割示例\n[demo] epoch=12 batch=80/120 loss=0.1842 images/s=48.6\n{\"phase\":\"training\",\"updates\":1400,\"progress_percent\":56}\n此日志为虚构示例，不代表实际运行的训练。\n"
+          "label": "尝试 1 · GPU 3",
+          "path": "/demo/queue/jobs/6/attempt-1.log",
+          "text": "[demo] 启动余弦调度消融实验\n[demo] epoch=12 batch=80/120 loss=0.1842\n此日志为虚构示例，不代表实际运行的训练。\n"
         },
         {
           "key": "project-0-train",
           "label": "项目日志 · train.log",
-          "path": "/demo/runs/segmentation/train.log",
+          "path": "/demo/runs/experiment-6/train.log",
           "text": "[demo] epoch 11 完成，已保存进度检查点\n[demo] epoch 12 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "步长2基线对照",
+      "argv": [
+        "node",
+        "train.mjs",
+        "--output",
+        "/demo/runs/experiment-5",
+        "--stride",
+        "2",
+        "--seed",
+        "42",
+        "--epochs",
+        "80"
+      ],
+      "cwd": "/demo/projects/segmentation",
+      "state": "running",
+      "createdAgo": 2820,
+      "updatedAgo": 5,
+      "message": "演示数据：训练进行中",
+      "attempts": [
+        {
+          "id": 5,
+          "number": 1,
+          "gpu": 2,
+          "state": "running",
+          "slurm_job_id": "demo-worker-03",
+          "log_path": "/demo/queue/jobs/5/attempt-1.log",
+          "createdAgo": 2580,
+          "startedAgo": 2520,
+          "finishedAgo": null,
+          "exit_code": null,
+          "message": ""
+        }
+      ],
+      "telemetry": {
+        "phase": "training",
+        "epoch": 26,
+        "batch": 80,
+        "batches": 120,
+        "updates": 1400,
+        "samples": 22400,
+        "percent": 32.5,
+        "loss": 0.1842,
+        "images_per_second": 48.6,
+        "budget_end": null,
+        "source": "/demo/runs/experiment-5/status.json",
+        "total_epochs": 80,
+        "percent_kind": "epoch",
+        "eta_seconds": 3720
+      },
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 2",
+          "path": "/demo/queue/jobs/5/attempt-1.log",
+          "text": "[demo] 启动步长2基线对照\n[demo] epoch=26 batch=80/120 loss=0.1842\n此日志为虚构示例，不代表实际运行的训练。\n"
+        },
+        {
+          "key": "project-0-train",
+          "label": "项目日志 · train.log",
+          "path": "/demo/runs/experiment-5/train.log",
+          "text": "[demo] epoch 25 完成，已保存进度检查点\n[demo] epoch 26 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "步长1全量训练",
+      "argv": [
+        "node",
+        "train.mjs",
+        "--output",
+        "/demo/runs/experiment-4",
+        "--stride",
+        "1",
+        "--seed",
+        "44",
+        "--epochs",
+        "90"
+      ],
+      "cwd": "/demo/projects/segmentation",
+      "state": "running",
+      "createdAgo": 4500,
+      "updatedAgo": 3,
+      "message": "演示数据：训练进行中",
+      "attempts": [
+        {
+          "id": 4,
+          "number": 1,
+          "gpu": 6,
+          "state": "running",
+          "slurm_job_id": "demo-worker-07",
+          "log_path": "/demo/queue/jobs/4/attempt-1.log",
+          "createdAgo": 4260,
+          "startedAgo": 4200,
+          "finishedAgo": null,
+          "exit_code": null,
+          "message": ""
+        }
+      ],
+      "telemetry": {
+        "phase": "training",
+        "epoch": 48,
+        "batch": 80,
+        "batches": 120,
+        "updates": 1400,
+        "samples": 22400,
+        "percent": 53.333333333333336,
+        "loss": 0.1842,
+        "images_per_second": 48.6,
+        "budget_end": null,
+        "source": "/demo/runs/experiment-4/status.json",
+        "total_epochs": 90,
+        "percent_kind": "epoch",
+        "eta_seconds": 3720
+      },
+      "logs": [
+        {
+          "key": "attempt-1",
+          "label": "尝试 1 · GPU 6",
+          "path": "/demo/queue/jobs/4/attempt-1.log",
+          "text": "[demo] 启动步长1全量训练\n[demo] epoch=48 batch=80/120 loss=0.1842\n此日志为虚构示例，不代表实际运行的训练。\n"
+        },
+        {
+          "key": "project-0-train",
+          "label": "项目日志 · train.log",
+          "path": "/demo/runs/experiment-4/train.log",
+          "text": "[demo] epoch 47 完成，已保存进度检查点\n[demo] epoch 48 / batch 80：loss 0.1842\n[demo] 脚本报告吞吐：48.6 图/秒\n"
         }
       ]
     },
     {
       "id": 3,
       "name": "图像分类 · 待运行",
-      "argv": ["node", "train.mjs", "--output-dir=/demo/runs/classification"],
+      "argv": [
+        "node",
+        "train.mjs",
+        "--output-dir=/demo/runs/classification"
+      ],
       "cwd": "/demo/projects/classification",
       "state": "queued",
       "createdAgo": 1200,
@@ -72,7 +291,12 @@
     {
       "id": 2,
       "name": "基准评估 · 已完成",
-      "argv": ["node", "evaluate.mjs", "--output", "/demo/runs/evaluation"],
+      "argv": [
+        "node",
+        "evaluate.mjs",
+        "--output",
+        "/demo/runs/evaluation"
+      ],
       "cwd": "/demo/projects/evaluation",
       "state": "succeeded",
       "createdAgo": 7200,
@@ -118,7 +342,12 @@
     {
       "id": 1,
       "name": "数据检查 · 失败示例",
-      "argv": ["node", "inspect.mjs", "--output", "/demo/runs/inspection"],
+      "argv": [
+        "node",
+        "inspect.mjs",
+        "--output",
+        "/demo/runs/inspection"
+      ],
       "cwd": "/demo/projects/inspection",
       "state": "failed",
       "createdAgo": 10000,
@@ -148,6 +377,64 @@
           "text": "[demo] 读取虚构输入清单\n[demo] Error: 清单第 12 行缺少文件名\n[demo] 退出码 1\n"
         }
       ]
+    }
+  ],
+  "gpu_metrics": [
+    {
+      "gpu": 0,
+      "utilization_percent": 0,
+      "memory_used_bytes": 429496729.6,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 1,
+      "utilization_percent": 0,
+      "memory_used_bytes": 429496729.6,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 2,
+      "utilization_percent": 78,
+      "memory_used_bytes": 13207024435.2,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 3,
+      "utilization_percent": 84,
+      "memory_used_bytes": 16213501542.4,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 4,
+      "utilization_percent": 0,
+      "memory_used_bytes": 429496729.6,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 5,
+      "utilization_percent": 0,
+      "memory_used_bytes": 429496729.6,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 6,
+      "utilization_percent": 96,
+      "memory_used_bytes": 19971597926.4,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
+    },
+    {
+      "gpu": 7,
+      "utilization_percent": 0,
+      "memory_used_bytes": 429496729.6,
+      "memory_total_bytes": 25769803776,
+      "updatedAgo": 2
     }
   ]
 }
