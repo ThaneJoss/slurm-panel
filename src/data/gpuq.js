@@ -72,20 +72,21 @@ function normalizedProgress(record, source, updated, updatedSource) {
   };
 }
 
-function progressRecordTime(record, created) {
+function progressRecordTime(record) {
   const value = record.timestamp ?? record.updated_at ?? record.time ?? record.updated;
   if (value == null) return null;
   let timestamp = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(timestamp) && typeof value === 'string') timestamp = Date.parse(value) / 1000;
   if (timestamp > 1e12) timestamp /= 1000;
-  return Number.isFinite(timestamp) && timestamp >= created ? timestamp : null;
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 async function telemetry(job, attempt, directories, logObservations, observe) {
+  const since = Math.max(job.created, attempt?.started ?? attempt?.created ?? job.created);
   const sources = [];
   if (attempt) {
     const result = await tail(attempt.log_path, 128 * 1024);
-    if (result.updated !== null && result.updated >= job.created) {
+    if (result.updated !== null && result.updated >= since) {
       const records = [];
       for (const line of result.text.split('\n')) {
         if (!line.startsWith('{')) continue;
@@ -103,7 +104,9 @@ async function telemetry(job, attempt, directories, logObservations, observe) {
           PROGRESS_KEYS.some((key) => Object.hasOwn(record, key)) &&
           belongsToJob(record, job)
         ) {
-          const recordTime = progressRecordTime(record, job.created);
+          const recordTime = progressRecordTime(record);
+          // An old timestamp belongs to an earlier attempt, not a new observation.
+          if (recordTime !== null && recordTime < since) continue;
           if (recordTime !== null) {
             observe(normalizedProgress(record, attempt.log_path, recordTime, 'record'));
           }
@@ -115,7 +118,7 @@ async function telemetry(job, attempt, directories, logObservations, observe) {
         const key = `${job.id}:${attempt.number}:${attempt.log_path}`;
         const content = JSON.stringify(record);
         const previous = logObservations.get(key);
-        const recordTime = progressRecordTime(record, job.created);
+        const recordTime = progressRecordTime(record);
         const observation = recordTime !== null
           ? { content, updated: recordTime, updatedSource: 'record' }
           : previous?.content === content ? previous
@@ -129,7 +132,7 @@ async function telemetry(job, attempt, directories, logObservations, observe) {
     for (const filename of ['status.json', 'progress.json']) {
       const path = join(directory, filename);
       const result = await progressFile(path);
-      if (result && result.updated >= job.created && belongsToJob(result.record, job)) {
+      if (result && result.updated >= since && belongsToJob(result.record, job)) {
         sources.push({ ...result, source: path, updatedSource: 'file' });
       }
     }

@@ -1,6 +1,7 @@
 import { open, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
+import { openLogFile } from './log-files.js';
 
 const OUTPUT_VARIABLES = ['V6B_OUTPUT', 'OUTPUT_DIR', 'RUN_DIR', 'TRAIN_OUTPUT_DIR'];
 const OUTPUT_OPTIONS = ['--output', '--output-dir', '--run-dir'];
@@ -23,7 +24,8 @@ export async function fileInfo(path) {
 async function readFileSection(path, limit, fromEnd) {
   let file;
   try {
-    file = await open(path, 'r');
+    file = fromEnd ? await openLogFile(path) : await open(path, 'r');
+    if (!file) return null;
     const info = await file.stat();
     if (!info.isFile() || (!fromEnd && info.size > limit)) return null;
     const length = Math.min(info.size, limit);

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
-import { open } from 'node:fs/promises';
+import { openLogFile } from '../data/log-files.js';
 import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 
@@ -93,9 +93,13 @@ export function createActions({ config, store, logger = console, runCommand = ru
     }
     let file;
     try {
-      file = await open(source.path, 'r');
+      file = await openLogFile(source.path);
     } catch (error) {
       if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+      json(request, response, 404, { error: 'Not found.' });
+      return;
+    }
+    if (!file) {
       json(request, response, 404, { error: 'Not found.' });
       return;
     }
